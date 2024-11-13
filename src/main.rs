@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use base64::{prelude::BASE64_STANDARD, Engine};
-use cesrox::primitives::codes::seed::SeedCode;
 use clap::{Parser, Subcommand};
 use config_file::ConfigFileError;
 use init::handle_init;
@@ -25,11 +24,11 @@ mod keri;
 mod mesagkesto;
 mod resolve;
 mod said;
+mod seed;
 mod sign;
 mod tel;
-mod utils;
 mod temporary_id;
-mod seed;
+mod utils;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -83,11 +82,11 @@ enum Commands {
         #[arg(short, long)]
         data: String,
     },
-    /// Generate Seed string from provided code and secret key encoded in base64. 
-    /// Code specify algorithm to use. Possible values are: 
-    ///     `A` for Ed25519 private key, 
-    ///     `J` for ECDSA secp256k1 private key, 
-    ///     'K' for Ed448 private key. 
+    /// Generate Seed string from provided code and secret key encoded in base64.
+    /// Code specify algorithm to use. Possible values are:
+    ///     `A` for Ed25519 private key,
+    ///     `J` for ECDSA secp256k1 private key,
+    ///     'K' for Ed448 private key.
     /// If no arguments it generates Ed25519 secret key.
     #[clap(verbatim_doc_comment)]
     Seed {
@@ -95,7 +94,7 @@ enum Commands {
         code: Option<String>,
         #[arg(short, long)]
         secret_key: Option<String>,
-    }
+    },
 }
 
 #[derive(Subcommand)]
@@ -152,7 +151,7 @@ pub enum KelCommands {
     },
     Get {
         #[clap(flatten)]
-        group: KelGettingGroup, 
+        group: KelGettingGroup,
         /// Identifier OOBI
         #[clap(short, long)]
         oobi: Option<String>,
@@ -260,28 +259,35 @@ async fn main() -> Result<(), CliError> {
         }) => {
             handle_init(alias, keys_file, config).await?;
         }
-        Some(Commands::Kel { command }) => match command {
-            KelCommands::Query { alias, identifier } => {
-                let identifier: IdentifierPrefix = identifier.parse().unwrap();
-                match handle_kel_query(&alias, &identifier).await {
-                    Ok(kel) => {
-                        println!("{}", kel);
+        Some(Commands::Kel { command }) => {
+            match command {
+                KelCommands::Query { alias, identifier } => {
+                    let identifier: IdentifierPrefix = identifier.parse().unwrap();
+                    match handle_kel_query(&alias, &identifier).await {
+                        Ok(kel) => {
+                            println!("{}", kel);
+                        }
+                        Err(_e) => println!("Kel not ready yet"),
                     }
-                    Err(_e) => println!("Kel not ready yet"),
                 }
-            }
-            KelCommands::Rotate {
-                alias,
-                rotation_config,
-            } => {
-                handle_rotate(&alias, rotation_config).await.unwrap();
-            }
-            KelCommands::Get {group,oobi, watcher_oobi } => {
-                match (group.alias, group.identifier) {
-                    (None, Some(id_str)) => {
-                        let id: IdentifierPrefix = id_str.parse().map_err(|e| CliError::UnparsableIdentifier(id_str.to_string()))?;
+                KelCommands::Rotate {
+                    alias,
+                    rotation_config,
+                } => {
+                    handle_rotate(&alias, rotation_config).await.unwrap();
+                }
+                KelCommands::Get {
+                    group,
+                    oobi,
+                    watcher_oobi,
+                } => {
+                    match (group.alias, group.identifier) {
+                        (None, Some(id_str)) => {
+                            let id: IdentifierPrefix = id_str
+                                .parse()
+                                .map_err(|_e| CliError::UnparsableIdentifier(id_str.to_string()))?;
 
-                        match (oobi, watcher_oobi) {
+                            match (oobi, watcher_oobi) {
                             (None, None) => println!("Missing OOBI of identifier that need to be find and watcher OOBI"),
                             (None, Some(_)) => println!("Missing OOBI of identifier that need to be find"),
                             (Some(_), None) => println!("Missing watcher OOBI"),
@@ -294,19 +300,19 @@ async fn main() -> Result<(), CliError> {
                                 };
                             },
                         };
-                    },
-                    (Some(alias), None) => {
-                        let kel = handle_get_alias_kel(&alias).await?;
-                        match kel {
-                            Some(kel) => println!("{}", kel),
-                            None => println!("\nNo kel of {} locally", alias),
-                        };
-                    },
-                    _ => unreachable!(),
-                };
-                
+                        }
+                        (Some(alias), None) => {
+                            let kel = handle_get_alias_kel(&alias).await?;
+                            match kel {
+                                Some(kel) => println!("{}", kel),
+                                None => println!("\nNo kel of {} locally", alias),
+                            };
+                        }
+                        _ => unreachable!(),
+                    };
+                }
             }
-        },
+        }
         Some(Commands::Mesagkesto { command }) => match command {
             MesagkestoCommands::Exchange {
                 content,
@@ -371,19 +377,21 @@ async fn main() -> Result<(), CliError> {
                 (None, Some(_sk)) => Ok("Code needs to be provided".to_string()),
                 (Some(_code), None) => Ok("Key needs to be provided".to_string()),
                 (Some(code), Some(sk)) => {
-                    let code = (&code).parse().map_err(|e| CliError::SeedError(code.to_string()));
-                    let sk = BASE64_STANDARD.decode(&sk).map_err(|_| CliError::B64Error(sk.to_string()));
+                    let code = code
+                        .parse()
+                        .map_err(|_e| CliError::SeedError(code.to_string()));
+                    let sk = BASE64_STANDARD
+                        .decode(&sk)
+                        .map_err(|_| CliError::B64Error(sk.to_string()));
                     match (code, sk) {
-                        (Ok(code), Ok(sk)) => {
-                            convert_to_seed(code, sk)
-                        },
+                        (Ok(code), Ok(sk)) => convert_to_seed(code, sk),
                         (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => Err(e),
                     }
-                },
+                }
             };
             match seed {
                 Ok(seed) => println!("{}", seed),
-                Err(e) => println!("{}", e.to_string()),
+                Err(e) => println!("{}", e),
             }
         }
         None => {}

@@ -63,7 +63,7 @@ pub async fn handle_query(
     match who_id.find_vc_state(&said) {
         Ok(Some(state)) => println!("{:?}", state),
         Ok(None) => println!("Tel not found"),
-        Err(e) => println!("{}", e.to_string()),
+        Err(e) => println!("{}", e),
     }
 
     Ok(())

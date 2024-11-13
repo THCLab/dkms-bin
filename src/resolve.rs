@@ -14,7 +14,7 @@ pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), CliError> 
             .await
             .map_err(KeriError::MechanicsError);
         id_cont
-            .send_oobi_to_watcher(&id_cont.id(), &oobi)
+            .send_oobi_to_watcher(id_cont.id(), &oobi)
             .await
             .map_err(KeriError::ControllerError)?;
     }
@@ -24,7 +24,7 @@ pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), CliError> 
 /// Returns witnesses' identifiers of alias
 pub fn witnesses(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     Ok(identifier
-        .find_state(&identifier.id())
+        .find_state(identifier.id())
         .map_err(KeriError::MechanicsError)?
         .witness_config
         .witnesses
@@ -43,7 +43,7 @@ pub fn watcher(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliErro
 pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     let msgbox = identifeir
         // .source
-        .get_end_role(&identifeir.id(), keri_core::oobi::Role::Messagebox)
+        .get_end_role(identifeir.id(), keri_core::oobi::Role::Messagebox)
         .map_err(KeriError::ControllerError)?
         .into_iter()
         .map(|b| b.eid)

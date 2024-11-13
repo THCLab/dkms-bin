@@ -84,18 +84,16 @@ pub async fn handle_init(
             config_path.push("config.yaml");
             if config_path.is_file() {
                 KelConfig::from_config_file(config_path).unwrap()
+            } else if ask_for_confirmation(&format!(
+                "Config file not found. Do you want to create one in `{}`? (y/N)",
+                &config_path.to_str().unwrap()
+            )) {
+                let config = KelConfig::default();
+                let f = File::create(config_path).unwrap();
+                serde_yaml::to_writer(f, &config).unwrap();
+                config
             } else {
-                if ask_for_confirmation(&format!(
-                    "Config file not found. Do you want to create one in `{}`? (y/N)",
-                    &config_path.to_str().unwrap()
-                )) {
-                    let config = KelConfig::default();
-                    let f = File::create(config_path).unwrap();
-                    serde_yaml::to_writer(f, &config).unwrap();
-                    config
-                } else {
-                    process::exit(1);
-                }
+                process::exit(1);
             }
         }
     };
@@ -120,13 +118,13 @@ pub async fn handle_init(
     match &kel_config.witness {
         Some(wits) if wits.is_empty() => println!("{}", info),
         None => println!("{}", info),
-        Some(_) => ()
+        Some(_) => (),
     };
-    
+
     let id = handle_new_id(&keys, kel_config, &db_path).await;
     match id {
         Ok(id) => {
-             // Save next keys seed
+            // Save next keys seed
             let mut nsk_path = store_path.clone();
             nsk_path.push("next_priv_key");
             let mut file = File::create(nsk_path)?;
@@ -145,16 +143,20 @@ pub async fn handle_init(
             priv_key_path.push("priv_key");
             let mut file = File::create(priv_key_path)?;
             file.write_all(keys.current.to_str().as_bytes())?;
-        },
+        }
         Err(e) => {
-            println!("{}", e.to_string())
-        },
+            println!("{}", e)
+        }
     }
 
     Ok(())
 }
 
-pub(crate) async fn handle_new_id(keys: &KeysConfig, kel_config: KelConfig, db_path: &Path) -> Result<Identifier, CliError> {
+pub(crate) async fn handle_new_id(
+    keys: &KeysConfig,
+    kel_config: KelConfig,
+    db_path: &Path,
+) -> Result<Identifier, CliError> {
     let (npk, _nsk) = keys
         .next
         .derive_key_pair()
@@ -187,7 +189,16 @@ async fn incept(
         ..ControllerConfig::default()
     })?);
     let signer = Arc::new(Signer::new_with_seed(&priv_key)?);
-    let id = setup_identifier(cont, signer, next_key, witness, witness_threshold, messagebox, watcher).await?;
+    let id = setup_identifier(
+        cont,
+        signer,
+        next_key,
+        witness,
+        witness_threshold,
+        messagebox,
+        watcher,
+    )
+    .await?;
 
     Ok(id)
 }

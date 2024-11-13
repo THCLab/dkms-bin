@@ -4,14 +4,11 @@ use controller::{
 };
 use keri_controller::{
     self as controller,
-    identifier::{mechanics::{query_mailbox, MechanicsError}, Identifier},
+    identifier::{mechanics::MechanicsError, Identifier},
 };
 use keri_core::{
-    actor::prelude::SelfAddressingIdentifier,
-    keys::KeysError,
-    prefix::IndexedSignature,
-    query::mailbox::SignedMailboxQuery,
-    signer::Signer,
+    actor::prelude::SelfAddressingIdentifier, keys::KeysError, prefix::IndexedSignature,
+    query::mailbox::SignedMailboxQuery, signer::Signer,
 };
 use std::sync::Arc;
 use thiserror::Error;
@@ -23,7 +20,7 @@ pub enum KeriError {
     #[error(transparent)]
     MechanicsError(#[from] MechanicsError),
     #[error(transparent)]
-    KeriError(#[from] keri_core::error::Error),
+    Keri(#[from] keri_core::error::Error),
     #[error(transparent)]
     SigningError(#[from] KeysError),
 }
@@ -67,12 +64,14 @@ pub async fn setup_identifier(
     next_pk: BasicPrefix,
     witness: Vec<LocationScheme>,
     witness_threshold: u64,
-    messagebox: Option<LocationScheme>,
+    _messagebox: Option<LocationScheme>,
     watcher: Vec<LocationScheme>,
 ) -> Result<Identifier, KeriError> {
     let pks = vec![BasicPrefix::Ed25519(signer.public_key())];
     let npks = vec![next_pk];
-    let signing_inception = cont.incept(pks, npks, witness.clone(), witness_threshold).await?;
+    let signing_inception = cont
+        .incept(pks, npks, witness.clone(), witness_threshold)
+        .await?;
     let signature = SelfSigningPrefix::new(
         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         signer.sign(signing_inception.as_bytes())?,
@@ -85,13 +84,13 @@ pub async fn setup_identifier(
 
     for wit in witness {
         // signing_identifier.resolve_oobi(Oobi::Location(oobi));
-        if let IdentifierPrefix::Basic(wit_id) = &wit.eid { 
-            query_mailbox(&mut signing_identifier, signer.clone(), &wit_id).await?;
+        if let IdentifierPrefix::Basic(wit_id) = &wit.eid {
+            query_mailbox(&mut signing_identifier, signer.clone(), wit_id).await?;
         };
-        
+
         // Send witness oobi to watcher.
         signing_identifier
-            .send_oobi_to_watcher(&signing_identifier.id(), &Oobi::Location(wit.clone()))
+            .send_oobi_to_watcher(signing_identifier.id(), &Oobi::Location(wit.clone()))
             .await?;
 
         match &wit.eid {
@@ -124,11 +123,14 @@ pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result
 
     id.notify_witnesses().await?;
 
-    if let Some(witness_id) = id.find_state(&id.id())?.witness_config.witnesses.get(0) {
-        let _queries = query_mailbox(id, signer.clone(), &witness_id).await?;
+    if let Some(witness_id) = id.find_state(id.id())?.witness_config.witnesses.first() {
+        let _queries = query_mailbox(id, signer.clone(), witness_id).await?;
         id.notify_backers().await?;
     } else {
-        let info = format!("No witnesses are configured for {} identifier, so TEL won't be publicly available.", &id.id());
+        let info = format!(
+            "No witnesses are configured for {} identifier, so TEL won't be publicly available.",
+            &id.id()
+        );
         println!("{}", info);
     };
     println!("Registry {} incepted for identifier: {}", reg_id, id.id());
@@ -145,7 +147,7 @@ pub async fn query_mailbox(
 ) -> Result<Vec<SignedMailboxQuery>, KeriError> {
     let mut out = vec![];
     for qry in id
-        .query_mailbox(&id.id(), &[witness_id.clone()])?
+        .query_mailbox(id.id(), &[witness_id.clone()])?
         .into_iter()
     {
         let signature = SelfSigningPrefix::Ed25519Sha512(km.sign(&qry.encode()?)?);
@@ -182,7 +184,7 @@ pub async fn query_mailbox(
 pub async fn query_tel(
     acdc_d: &SelfAddressingIdentifier,
     registry_id: SelfAddressingIdentifier,
-    issuer_id: &IdentifierPrefix,
+    _issuer_id: &IdentifierPrefix,
     id: &Identifier,
     km: Arc<Signer>,
 ) -> Result<(), KeriError> {
@@ -282,7 +284,7 @@ pub async fn issue(
 
     identifier.notify_witnesses().await?;
     let witnesses = identifier
-        .find_state(&identifier.id())?
+        .find_state(identifier.id())?
         .witness_config
         .witnesses;
 

@@ -12,7 +12,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum LoadingError {
     #[error(transparent)]
-    FileError(#[from] std::io::Error),
+    File(#[from] std::io::Error),
     #[error("Path error: {0}")]
     PathError(String),
     #[error("Parsing error: {0}")]
