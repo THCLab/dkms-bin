@@ -331,8 +331,11 @@ async fn main() -> Result<(), CliError> {
         },
         Some(Commands::Oobi { command }) => match command {
             OobiCommands::Get { role, alias } => {
-                let lcs = resolve::handle_oobi(&alias, &role)?;
-                println!("{}", serde_json::to_string(&lcs).unwrap());
+                match resolve::handle_oobi(&alias, &role) {
+                    Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
+                    Err(e) => println!("{}", e)
+                }
+                
             }
             OobiCommands::Resolve { alias, file } => handle_resolve(&alias, file).await?,
         },

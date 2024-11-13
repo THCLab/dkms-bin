@@ -11,16 +11,20 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum LoadingError {
+    #[error("Unknown identifier alias: {0}")]
+    UnknownIdentifier(String),
     #[error(transparent)]
     File(#[from] std::io::Error),
-    #[error("Path error: {0}")]
-    PathError(String),
+    #[error("Can't load a path: {0}")]
+    PathError(PathBuf),
     #[error("Parsing error: {0}")]
     ParsingError(String),
     #[error("Controller error: {0}")]
     ControllerError(keri_controller::error::ControllerError),
     #[error("Signer error: {0}")]
     SignerError(String),
+    #[error("Can't load home path")]
+    HomePath,
 }
 
 pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
@@ -34,7 +38,7 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
 
     let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
         .map_err(|_e| {
-            LoadingError::PathError("Should have been able to read the file".to_string())
+            LoadingError::UnknownIdentifier(alias.to_string())
         })?
         .parse()
         .map_err(|_e| {
@@ -66,7 +70,7 @@ pub fn load_identifier(alias: &str) -> Result<IdentifierPrefix, LoadingError> {
 
     let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
         .map_err(|_e| {
-            LoadingError::PathError("Should have been able to read the file".to_string())
+            LoadingError::PathError(id_path.clone())
         })?
         .trim()
         .parse()
@@ -136,5 +140,5 @@ pub fn handle_info(alias: &str) -> Result<(), LoadingError> {
 }
 
 pub fn load_homedir() -> Result<PathBuf, LoadingError> {
-    home::home_dir().ok_or(LoadingError::PathError("Can't load home dir".to_string()))
+    home::home_dir().ok_or(LoadingError::HomePath)
 }

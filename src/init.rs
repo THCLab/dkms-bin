@@ -1,12 +1,8 @@
 use std::{
-    fs::{self, create_dir_all, File},
-    io::Write,
-    path::{Path, PathBuf},
-    process,
-    sync::Arc,
+    error::Error, fmt::Display, fs::{self, create_dir_all, File}, io::Write, path::{Path, PathBuf}, process, sync::Arc
 };
 
-use config_file::FromConfigFile;
+use config_file::{ConfigFileError, FromConfigFile};
 use ed25519_dalek::SigningKey;
 
 use keri_controller::{
@@ -28,6 +24,26 @@ pub(crate) struct KelConfig {
     pub watcher: Option<Vec<LocationScheme>>,
 }
 
+#[derive(Debug)]
+pub struct ConfigError(ConfigFileError);
+
+impl Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            ConfigFileError::FileAccess(error) => write!(f, "Configuration file loading error: {}", error),
+            ConfigFileError::Toml(error) => write!(f, "Configuration file error: {}", error),
+            ConfigFileError::Yaml(error) => write!(f, "Configuration file error: {}", error),
+            ConfigFileError::UnsupportedFormat => write!(f, "Unsupported configuration file error"),
+        }
+    }
+}
+
+impl Error for ConfigError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
 impl Default for KelConfig {
     fn default() -> Self {
         Self {
@@ -35,6 +51,11 @@ impl Default for KelConfig {
             witness_threshold: 0,
             watcher: None,
         }
+    }
+}
+impl KelConfig {
+    pub fn load_from_file(config_path: &Path) -> Result<Self, ConfigError> {
+        Ok(KelConfig::from_config_file(config_path).map_err(ConfigError)?)
     }
 }
 
@@ -74,7 +95,15 @@ pub async fn handle_init(
     config_file: Option<PathBuf>,
 ) -> Result<(), CliError> {
     let kel_config = match config_file {
-        Some(config_path) => KelConfig::from_config_file(config_path).unwrap(),
+        Some(config_path) => {
+            match KelConfig::load_from_file(&config_path) {
+                Ok(config) => config,
+                Err(e) => {
+                    println!("{} init failed. {}", alias, e);
+                    process::exit(1);
+                }
+            }
+        },
         None => {
             // Check if file exists in default location
             let mut config_path = utils::load_homedir()?;
