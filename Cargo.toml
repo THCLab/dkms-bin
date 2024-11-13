@@ -31,3 +31,7 @@ base64 = "0.22.1"
 
 [dev_dependencies]
 tempfile = "3.10.0"
+
+[[bin]]
+name = "dkms"
+path = "src/main.rs"
