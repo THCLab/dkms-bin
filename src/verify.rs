@@ -44,13 +44,9 @@ pub async fn handle_verify(
         match who_id.verify_from_cesr(&message) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
             Err(ControllerError::VerificationError(e)) => {
-                if e.iter().any(|(e, _)| {
-                    if let VerificationError::VerificationFailure = e {
-                        true
-                    } else {
-                        false
-                    }
-                }) {
+                if e.iter()
+                    .any(|(e, _)| matches!(e, VerificationError::VerificationFailure))
+                {
                     Ok(ACDCState::FaultySignature)
                 } else {
                     Err(ControllerError::VerificationError(e))
@@ -60,11 +56,11 @@ pub async fn handle_verify(
         }
     } else {
         // We expect that message got fields: d, ii, ri.
-        let h: NecessaryFields = serde_json::from_str(&message).unwrap();
+        let fields: NecessaryFields = serde_json::from_str(&message).unwrap();
 
-        let issuer: IdentifierPrefix = h.issuer_identifier.parse().unwrap();
-        let said: SelfAddressingIdentifier = h.digest.parse().unwrap();
-        let registry_id: SelfAddressingIdentifier = h.registry_id.parse().unwrap();
+        let issuer: IdentifierPrefix = fields.issuer_identifier.parse().unwrap();
+        let said: SelfAddressingIdentifier = fields.digest.parse().unwrap();
+        let registry_id: SelfAddressingIdentifier = fields.registry_id.parse().unwrap();
 
         let signer = Arc::new(load_signer(alias).unwrap());
         for _i in 0..5 {
@@ -79,7 +75,7 @@ pub async fn handle_verify(
             }
         }
 
-        let st = who_id.find_vc_state(&h.digest.parse().unwrap()).unwrap();
+        let st = who_id.find_vc_state(&said).unwrap();
         match st {
             Some(TelState::Issued(_said)) => Ok(ACDCState::Issued),
             Some(TelState::NotIssued) => Ok(ACDCState::NotFound),
