@@ -37,9 +37,7 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
     registry_path.push("reg_id");
 
     let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
-        .map_err(|_e| {
-            LoadingError::UnknownIdentifier(alias.to_string())
-        })?
+        .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))?
         .parse()
         .map_err(|_e| {
             LoadingError::ParsingError(format!(
@@ -69,9 +67,7 @@ pub fn load_identifier(alias: &str) -> Result<IdentifierPrefix, LoadingError> {
     id_path.push("id");
 
     let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
-        .map_err(|_e| {
-            LoadingError::PathError(id_path.clone())
-        })?
+        .map_err(|_e| LoadingError::PathError(id_path.clone()))?
         .trim()
         .parse()
         .map_err(|_e| {

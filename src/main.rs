@@ -15,6 +15,7 @@ use sign::handle_sign;
 use tel::{handle_issue, handle_query, handle_tel_oobi};
 use thiserror::Error;
 use utils::{handle_info, LoadingError};
+use verify::handle_verify;
 
 use crate::said::handle_sad;
 
@@ -29,6 +30,7 @@ mod sign;
 mod tel;
 mod temporary_id;
 mod utils;
+mod verify;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -81,6 +83,14 @@ enum Commands {
         alias: String,
         #[arg(short, long)]
         data: String,
+    },
+    Verify {
+        #[arg(short, long)]
+        alias: String,
+        #[arg(short, long)]
+        oobi: Vec<String>,
+        #[arg(short, long)]
+        message: String,
     },
     /// Generate Seed string from provided code and secret key encoded in base64.
     /// Code specify algorithm to use. Possible values are:
@@ -330,13 +340,10 @@ async fn main() -> Result<(), CliError> {
             }
         },
         Some(Commands::Oobi { command }) => match command {
-            OobiCommands::Get { role, alias } => {
-                match resolve::handle_oobi(&alias, &role) {
-                    Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
-                    Err(e) => println!("{}", e)
-                }
-                
-            }
+            OobiCommands::Get { role, alias } => match resolve::handle_oobi(&alias, &role) {
+                Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
+                Err(e) => println!("{}", e),
+            },
             OobiCommands::Resolve { alias, file } => handle_resolve(&alias, file).await?,
         },
         Some(Commands::Tel { command }) => match command {
@@ -396,6 +403,30 @@ async fn main() -> Result<(), CliError> {
                 Ok(seed) => println!("{}", seed),
                 Err(e) => println!("{}", e),
             }
+        }
+        Some(Commands::Verify {
+            alias,
+            oobi,
+            message,
+        }) => {
+            match handle_verify(
+                &alias,
+                &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
+                message,
+            )
+            .await
+            {
+                Ok(result) => match result {
+                    verify::ACDCState::FaultySignature => println!("Faulty signatures"),
+                    verify::ACDCState::VerificationSuccess => println!("Verification success"),
+                    verify::ACDCState::Issued => println!("ACDC issued"),
+                    verify::ACDCState::Revoked => println!("ACDC revoked"),
+                    verify::ACDCState::NotFound => println!("ACDC state not found"),
+                },
+                Err(_e) => {
+                    println!("Verification error");
+                }
+            };
         }
         None => {}
     }

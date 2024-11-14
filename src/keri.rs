@@ -289,7 +289,7 @@ pub async fn issue(
         .witnesses;
     if let Some(witness) = witnesses.first() {
         let _qry = query_mailbox(identifier, km.clone(), &witness).await?;
-    } 
+    }
 
     identifier.notify_backers().await?;
 

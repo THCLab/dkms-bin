@@ -1,5 +1,11 @@
 use std::{
-    error::Error, fmt::Display, fs::{self, create_dir_all, File}, io::Write, path::{Path, PathBuf}, process, sync::Arc
+    error::Error,
+    fmt::Display,
+    fs::{self, create_dir_all, File},
+    io::Write,
+    path::{Path, PathBuf},
+    process,
+    sync::Arc,
 };
 
 use config_file::{ConfigFileError, FromConfigFile};
@@ -30,7 +36,9 @@ pub struct ConfigError(ConfigFileError);
 impl Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            ConfigFileError::FileAccess(error) => write!(f, "Configuration file loading error: {}", error),
+            ConfigFileError::FileAccess(error) => {
+                write!(f, "Configuration file loading error: {}", error)
+            }
             ConfigFileError::Toml(error) => write!(f, "Configuration file error: {}", error),
             ConfigFileError::Yaml(error) => write!(f, "Configuration file error: {}", error),
             ConfigFileError::UnsupportedFormat => write!(f, "Unsupported configuration file error"),
@@ -95,13 +103,11 @@ pub async fn handle_init(
     config_file: Option<PathBuf>,
 ) -> Result<(), CliError> {
     let kel_config = match config_file {
-        Some(config_path) => {
-            match KelConfig::load_from_file(&config_path) {
-                Ok(config) => config,
-                Err(e) => {
-                    println!("{} init failed. {}", alias, e);
-                    process::exit(1);
-                }
+        Some(config_path) => match KelConfig::load_from_file(&config_path) {
+            Ok(config) => config,
+            Err(e) => {
+                println!("{} init failed. {}", alias, e);
+                process::exit(1);
             }
         },
         None => {
