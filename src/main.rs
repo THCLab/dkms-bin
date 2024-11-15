@@ -74,8 +74,8 @@ enum Commands {
         #[command(subcommand)]
         command: SaidCommands,
     },
-    Info {
-        #[arg(short, long)]
+    Whoami {
+        // #[arg(short, long)]
         alias: String,
     },
     Sign {
@@ -374,7 +374,7 @@ async fn main() -> Result<(), CliError> {
                 println!("{}", sad);
             }
         },
-        Some(Commands::Info { alias }) => {
+        Some(Commands::Whoami { alias } ) => {
             handle_info(&alias)?;
         }
         Some(Commands::Sign { alias, data }) => {

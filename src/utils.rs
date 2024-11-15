@@ -130,7 +130,7 @@ pub fn handle_info(alias: &str) -> Result<(), LoadingError> {
     } else {
         json!({"id": cont.id()})
     };
-    println!("{}", serde_json::to_string(&info).unwrap());
+    println!("{}", serde_json::to_string_pretty(&info).unwrap());
 
     Ok(())
 }
