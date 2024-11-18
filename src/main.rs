@@ -374,7 +374,7 @@ async fn main() -> Result<(), CliError> {
                 println!("{}", sad);
             }
         },
-        Some(Commands::Whoami { alias } ) => {
+        Some(Commands::Whoami { alias }) => {
             handle_info(&alias)?;
         }
         Some(Commands::Sign { alias, data }) => {
@@ -423,8 +423,8 @@ async fn main() -> Result<(), CliError> {
                     verify::ACDCState::Revoked => println!("ACDC revoked"),
                     verify::ACDCState::NotFound => println!("ACDC state not found"),
                 },
-                Err(_e) => {
-                    println!("Verification error");
+                Err(e) => {
+                    println!("Verification error: {}", e);
                 }
             };
         }
