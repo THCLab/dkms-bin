@@ -15,6 +15,7 @@ use sign::handle_sign;
 use tel::{handle_issue, handle_query, handle_tel_oobi};
 use thiserror::Error;
 use utils::{handle_info, LoadingError};
+use verification_status::VerificationStatus;
 use verify::handle_verify;
 
 use crate::said::handle_sad;
@@ -30,6 +31,7 @@ mod sign;
 mod tel;
 mod temporary_id;
 mod utils;
+mod verification_status;
 mod verify;
 
 #[derive(Parser)]
@@ -409,24 +411,17 @@ async fn main() -> Result<(), CliError> {
             oobi,
             message,
         }) => {
-            match handle_verify(
+            let status = match handle_verify(
                 &alias,
                 &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
                 message,
             )
             .await
             {
-                Ok(result) => match result {
-                    verify::ACDCState::FaultySignature => println!("Faulty signatures"),
-                    verify::ACDCState::VerificationSuccess => println!("Verification success"),
-                    verify::ACDCState::Issued => println!("ACDC issued"),
-                    verify::ACDCState::Revoked => println!("ACDC revoked"),
-                    verify::ACDCState::NotFound => println!("ACDC state not found"),
-                },
-                Err(e) => {
-                    println!("Verification error: {}", e);
-                }
+                Ok(result) => VerificationStatus::from(result),
+                Err(e) => VerificationStatus::from(e),
             };
+            println!("{}", serde_json::to_string_pretty(&status).unwrap());
         }
         None => {}
     }
