@@ -1,10 +1,9 @@
 use std::{
     error::Error,
     fmt::Display,
-    fs::{self, create_dir_all, File},
+    fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
-    process,
     sync::Arc,
 };
 
@@ -13,7 +12,7 @@ use ed25519_dalek::SigningKey;
 
 use keri_controller::{
     config::ControllerConfig, controller::Controller, identifier::Identifier, BasicPrefix,
-    CesrPrimitive, LocationScheme, Oobi, SeedPrefix,
+    CesrPrimitive, LocationScheme, SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::{Deserialize, Serialize};
@@ -63,8 +62,8 @@ impl Default for KelConfig {
     }
 }
 impl KelConfig {
-    pub fn load_from_file(config_path: &Path) -> Result<Self, ConfigError> {
-        Ok(KelConfig::from_config_file(config_path).map_err(ConfigError)?)
+    pub fn _load_from_file(config_path: &Path) -> Result<Self, ConfigError> {
+        KelConfig::from_config_file(config_path).map_err(ConfigError)
     }
 }
 
@@ -85,7 +84,7 @@ impl Default for KeysConfig {
     }
 }
 
-fn ask_for_confirmation(prompt: &str) -> bool {
+fn _ask_for_confirmation(prompt: &str) -> bool {
     print!("{} ", prompt);
     std::io::stdout().flush().unwrap();
 
@@ -105,16 +104,20 @@ pub async fn handle_init(
     watchers: Option<Vec<String>>,
     witness_threshold: u64,
 ) -> Result<(), CliError> {
-    let witnesses_oobi = witnesses.map(|list| {
-        parse_json_arguments::<LocationScheme>(
-            &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
-        )
-    }).transpose()?;
-    let watchers_oobi = watchers.map(|list| {
-        parse_json_arguments::<LocationScheme>(
-            &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
-        )
-    }).transpose()?;
+    let witnesses_oobi = witnesses
+        .map(|list| {
+            parse_json_arguments::<LocationScheme>(
+                &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
+            )
+        })
+        .transpose()?;
+    let watchers_oobi = watchers
+        .map(|list| {
+            parse_json_arguments::<LocationScheme>(
+                &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
+            )
+        })
+        .transpose()?;
     let kel_config = KelConfig {
         witness: witnesses_oobi,
         witness_threshold,

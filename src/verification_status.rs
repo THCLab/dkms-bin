@@ -13,9 +13,6 @@ pub enum VerificationStatus {
 impl From<ACDCState> for VerificationStatus {
     fn from(value: ACDCState) -> Self {
         match value {
-            ACDCState::FaultySignature => VerificationStatus::Invalid {
-                description: "Faulty signatures".to_string(),
-            },
             ACDCState::VerificationSuccess => VerificationStatus::Ok {
                 description: "Verification success".to_string(),
             },

@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf, sync::Arc};
 use anyhow::Result;
 use keri_controller::{
     config::ControllerConfig, controller::Controller, identifier::Identifier, IdentifierPrefix,
-    SeedPrefix,
+    LocationScheme, SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::de::DeserializeOwned;
@@ -154,22 +154,15 @@ pub fn extract_objects<T: DeserializeOwned>(
     value: &serde_json::Value,
 ) -> Result<Vec<T>, ExtractionError> {
     match value {
-        Value::Array(vec) => vec
-            .into_iter()
-            .fold(Ok(vec![]), |mut acc, el| match extract_objects(el) {
-                Ok(mut obj) => {
-                    let _ = acc.as_mut().map(|oobis| oobis.append(&mut obj));
-                    acc
-                }
-                Err(e) => return Err(e),
-            }),
+        Value::Array(vec) => vec.iter().try_fold(vec![], |mut acc, el| {
+            acc.append(&mut extract_objects(el)?);
+            Ok(acc)
+        }),
         Value::Object(map) => match from_value::<T>(Value::Object(map.clone())) {
             Ok(value) => Ok(vec![value]),
-            Err(_e) => {
-                return Err(ExtractionError::InvalidType(
-                    serde_json::to_string(&value).unwrap(),
-                ))
-            }
+            Err(_e) => Err(ExtractionError::InvalidType(
+                serde_json::to_string(&value).unwrap(),
+            )),
         },
         _ => Err(ExtractionError::UnexpectedJsonValue),
     }
@@ -178,23 +171,38 @@ pub fn extract_objects<T: DeserializeOwned>(
 pub fn parse_json_arguments<T: DeserializeOwned>(
     input_oobis: &[&str],
 ) -> Result<Vec<T>, ExtractionError> {
-    let oobis: Vec<T> = input_oobis.iter().fold(Ok(vec![]), |mut acc, oobi_str| {
-        match serde_json::from_str::<Value>(&oobi_str) {
+    let oobis: Vec<T> = input_oobis.iter().try_fold(vec![], |mut acc, oobi_str| {
+        match serde_json::from_str::<Value>(oobi_str) {
             Ok(ok) => {
-                let objects = crate::utils::extract_objects(&ok);
-
-                match objects {
-                    Ok(mut obj) => {
-                        let _ = acc.as_mut().map(|oobis| oobis.append(&mut obj));
-                    }
-                    Err(e) => {
-                        acc = Err(e);
-                    }
-                };
-                acc
+                let mut objects = crate::utils::extract_objects(&ok)?;
+                acc.append(&mut objects);
+                Ok(acc)
             }
             Err(_e) => Err(ExtractionError::InvalidJson(oobi_str.to_string())),
         }
     })?;
     Ok(oobis)
+}
+
+#[test]
+pub fn test_parse_json_arguments() {
+    let input_single = r#"{"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}"#;
+    let loc = parse_json_arguments::<LocationScheme>(&[input_single]);
+    assert!(loc.is_ok());
+
+    let input_list = r#"[{"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}, {"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}]"#;
+    let loc = parse_json_arguments::<LocationScheme>(&[input_list]);
+    assert!(loc.is_ok());
+
+    let input_wrong = r#"{"eid":"WRONG_ID","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}"#;
+    let loc = parse_json_arguments::<LocationScheme>(&[input_wrong]);
+    assert!(matches!(loc, Err(ExtractionError::InvalidType(_))));
+
+    let input_wrong = r#"not_json"#;
+    let loc = parse_json_arguments::<LocationScheme>(&[input_wrong]);
+    assert!(matches!(loc, Err(ExtractionError::InvalidJson(_))));
+
+    let input_multi = [input_list, input_single];
+    let loc = parse_json_arguments::<LocationScheme>(&input_multi);
+    assert!(loc.is_ok());
 }

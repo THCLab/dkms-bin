@@ -14,7 +14,7 @@ use seed::{convert_to_seed, generate_seed};
 use sign::handle_sign;
 use tel::{handle_issue, handle_query, handle_tel_oobi};
 use thiserror::Error;
-use utils::{handle_info, LoadingError};
+use utils::{handle_info, ExtractionError, LoadingError};
 use verification_status::VerificationStatus;
 use verify::handle_verify;
 
@@ -256,18 +256,23 @@ pub enum CliError {
     B64Error(String),
     #[error("Invalid seed code: {0}")]
     SeedError(String),
+    #[error("Can't parse provided oobi. {0}")]
+    UnparsableOobi(#[from] ExtractionError),
 }
 
 #[tokio::main]
 async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
+    if let Err(e) = process_command(cli.command).await {
+        println!("{}", e);
+        std::process::exit(1);
+    };
 
-    // You can check the value provided by positional arguments, or option arguments
-    if let Some(name) = cli.name.as_deref() {
-        println!("Value for name: {name}");
-    }
+    Ok(())
+}
 
-    match cli.command {
+async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
+    match command {
         Some(Commands::Init {
             alias,
             keys_file,
@@ -448,7 +453,7 @@ async fn main() -> Result<(), CliError> {
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
         }
         None => {}
-    }
+    };
     Ok(())
 }
 

@@ -67,7 +67,7 @@ impl std::fmt::Display for VerificationErrorWrapper {
 impl std::fmt::Display for ErrorList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for err in &self.0 {
-            write!(f, "{}\n", err)?;
+            writeln!(f, "{}", err)?;
         }
         write!(f, "")
     }
@@ -75,7 +75,6 @@ impl std::fmt::Display for ErrorList {
 
 #[derive(Debug)]
 pub enum ACDCState {
-    FaultySignature,
     VerificationSuccess,
     Issued,
     Revoked,
@@ -119,13 +118,13 @@ pub async fn handle_verify(
                                 VerificationError::MoreInfo(MoreInfoError::EventNotFound(
                                     EventSeal {
                                         prefix,
-                                        sn,
-                                        event_digest,
+                                        sn: _,
+                                        event_digest: _,
                                     },
                                 )) => {
                                     // check if identifier oobi is known
                                     let oobis = who_id
-                                        .get_end_role(&prefix, keri_core::oobi::Role::Witness)
+                                        .get_end_role(prefix, keri_core::oobi::Role::Witness)
                                         .unwrap();
                                     if oobis.is_empty() {
                                         VerifyHandleError::MissingOobi(prefix.clone())
