@@ -2,7 +2,8 @@ use std::{fs, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use keri_controller::{
-    config::ControllerConfig, controller::Controller, identifier::Identifier, IdentifierPrefix, SeedPrefix,
+    config::ControllerConfig, controller::Controller, identifier::Identifier, IdentifierPrefix,
+    SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::de::DeserializeOwned;
@@ -27,9 +28,14 @@ pub enum LoadingError {
     HomePath,
 }
 
+pub fn working_directory() -> Result<PathBuf, LoadingError> {
+    let mut working_directory = load_homedir()?;
+    working_directory.push(".dkms-dev-cli");
+    Ok(working_directory)
+}
+
 pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
-    let mut store_path = load_homedir()?;
-    store_path.push(".dkms-dev-cli");
+    let mut store_path = working_directory()?;
     store_path.push(alias);
     let mut id_path = store_path.clone();
     id_path.push("id");
@@ -60,8 +66,7 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
 }
 
 pub fn load_identifier(alias: &str) -> Result<IdentifierPrefix, LoadingError> {
-    let mut store_path = load_homedir()?;
-    store_path.push(".dkms-dev-cli");
+    let mut store_path = working_directory()?;
     store_path.push(alias);
     let mut id_path = store_path.clone();
     id_path.push("id");
@@ -80,8 +85,7 @@ pub fn load_identifier(alias: &str) -> Result<IdentifierPrefix, LoadingError> {
 }
 
 pub fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
-    let mut db_path = load_homedir()?;
-    db_path.push(".dkms-dev-cli");
+    let mut db_path = working_directory()?;
     db_path.push(alias);
     db_path.push("db");
 
@@ -94,8 +98,7 @@ pub fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
 }
 
 pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
-    let mut path = load_homedir()?;
-    path.push(".dkms-dev-cli");
+    let mut path = working_directory()?;
     path.push(alias);
     path.push("priv_key");
     let sk_str = fs::read_to_string(path)?;
@@ -109,8 +112,7 @@ pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
 }
 
 pub fn load_next_signer(alias: &str) -> Result<Signer, LoadingError> {
-    let mut path = load_homedir()?;
-    path.push(".dkms-dev-cli");
+    let mut path = working_directory()?;
     path.push(alias);
     path.push("next_priv_key");
     let sk_str = fs::read_to_string(path)?;
@@ -186,7 +188,7 @@ pub fn parse_json_arguments<T: DeserializeOwned>(
 #[test]
 pub fn test_parse_json_arguments() {
     use keri_controller::LocationScheme;
-    
+
     let input_single = r#"{"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}"#;
     let loc = parse_json_arguments::<LocationScheme>(&[input_single]);
     assert!(loc.is_ok());

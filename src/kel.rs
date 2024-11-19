@@ -8,7 +8,7 @@ use std::{
 use crate::{
     keri::KeriError,
     temporary_id::{clear_temporary_id, create_temporary_id},
-    utils::load_homedir,
+    utils::working_directory,
 };
 use ed25519_dalek::SigningKey;
 use figment::{
@@ -109,8 +109,7 @@ pub async fn handle_rotate(alias: &str, config_path: Option<PathBuf>) -> Result<
     print!("\nKeys rotated for alias {} ({})", alias, id.id());
 
     // Save new settings in file
-    let mut store_path = load_homedir()?;
-    store_path.push(".dkms-dev-cli");
+    let mut store_path = working_directory()?;
     store_path.push(alias);
 
     let mut nsk_path = store_path.clone();

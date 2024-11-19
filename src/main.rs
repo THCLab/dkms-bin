@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use clap::{Parser, Subcommand};
@@ -12,9 +12,10 @@ use resolve::handle_resolve;
 use said::SaidError;
 use seed::{convert_to_seed, generate_seed};
 use sign::handle_sign;
+use tabled::{builder::Builder, settings::Style};
 use tel::{handle_issue, handle_query, handle_tel_oobi};
 use thiserror::Error;
-use utils::{handle_info, ExtractionError, LoadingError};
+use utils::{handle_info, working_directory, ExtractionError, LoadingError};
 use verification_status::VerificationStatus;
 use verify::handle_verify;
 
@@ -81,7 +82,6 @@ enum Commands {
         command: SaidCommands,
     },
     Whoami {
-        // #[arg(short, long)]
         alias: String,
     },
     Sign {
@@ -111,6 +111,8 @@ enum Commands {
         #[arg(short, long)]
         secret_key: Option<String>,
     },
+    Info,
+    List,
 }
 
 #[derive(Subcommand)]
@@ -454,8 +456,44 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             };
             match &status {
                 VerificationStatus::Ok { description: _ } => println!("{}", &status),
-                VerificationStatus::Error { description: _ } | VerificationStatus::Invalid { description: _ } => return Err(CliError::Verification(status)),
+                VerificationStatus::Error { description: _ }
+                | VerificationStatus::Invalid { description: _ } => {
+                    return Err(CliError::Verification(status))
+                }
             }
+        }
+        Some(Commands::Info) => {
+            let working_directory = working_directory()?;
+            println!("Working directory: {}", working_directory.to_str().unwrap());
+        }
+        Some(Commands::List) => {
+            let working_directory = working_directory()?;
+            if let Ok(contents) = fs::read_dir(&working_directory) {
+
+                let mut builder = Builder::new();
+                builder.push_record(["ALIAS", "IDENTIFIER"]);
+                for entry in contents {
+                    let entry = entry?;
+                    let metadata = entry.metadata()?;
+
+                    // Check if the entry is a directory
+                    if metadata.is_dir() {
+                        if let Some(alias) = entry.file_name().to_str() {
+                            let mut id_path = working_directory.clone();
+                            id_path.push(alias);
+                            id_path.push("id");
+                            let identifier = fs::read_to_string(id_path)
+                                .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))?;
+                            builder.push_record([alias.to_string(), identifier.to_string() ]);
+
+                        }
+                    }
+                };
+                let table = builder.build()
+                    .with(Style::blank())
+                    .to_string();
+                print!("{}", table);
+            };
         }
         None => {}
     };

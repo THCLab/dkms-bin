@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::{
     keri::{issue, query_tel},
-    utils::{load, load_homedir, load_signer},
+    utils::{load, load_signer, working_directory},
     CliError,
 };
 
@@ -16,8 +16,7 @@ pub async fn handle_tel_incept(alias: &str) -> Result<(), CliError> {
     crate::keri::incept_registry(&mut id, signer).await?;
 
     // Save registry identifier
-    let mut store_path = load_homedir()?;
-    store_path.push(".dkms-dev-cli");
+    let mut store_path = working_directory()?;
     store_path.push(alias);
 
     let mut reg_path = store_path.clone();

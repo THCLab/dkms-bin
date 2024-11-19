@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     keri::{setup_identifier, KeriError},
-    utils::{self, parse_json_arguments},
+    utils::{parse_json_arguments, working_directory},
     CliError,
 };
 
@@ -133,8 +133,7 @@ pub async fn handle_init(
     };
 
     // Compute kel database path
-    let mut store_path = utils::load_homedir()?;
-    store_path.push(".dkms-dev-cli");
+    let mut store_path = working_directory()?;
     store_path.push(&alias);
     fs::create_dir_all(&store_path)?;
     let mut db_path = store_path.clone();
