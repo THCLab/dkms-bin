@@ -258,6 +258,8 @@ pub enum CliError {
     SeedError(String),
     #[error("Can't parse provided oobi. {0}")]
     UnparsableOobi(#[from] ExtractionError),
+    #[error("{0}")]
+    Verification(VerificationStatus),
 }
 
 #[tokio::main]
@@ -450,7 +452,10 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                 Ok(result) => VerificationStatus::from(result),
                 Err(e) => VerificationStatus::from(e),
             };
-            println!("{}", serde_json::to_string_pretty(&status).unwrap());
+            match &status {
+                VerificationStatus::Ok { description: _ } => println!("{}", &status),
+                VerificationStatus::Error { description: _ } | VerificationStatus::Invalid { description: _ } => return Err(CliError::Verification(status)),
+            }
         }
         None => {}
     };

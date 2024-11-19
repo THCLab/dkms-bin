@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::Serialize;
 
 use crate::verify::{ACDCState, VerifyHandleError};
@@ -34,5 +36,11 @@ impl From<VerifyHandleError> for VerificationStatus {
         VerificationStatus::Error {
             description: value.to_string(),
         }
+    }
+}
+
+impl Display for VerificationStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string_pretty(self).unwrap())
     }
 }

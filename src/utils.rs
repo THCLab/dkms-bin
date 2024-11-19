@@ -2,8 +2,7 @@ use std::{fs, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use keri_controller::{
-    config::ControllerConfig, controller::Controller, identifier::Identifier, IdentifierPrefix,
-    LocationScheme, SeedPrefix,
+    config::ControllerConfig, controller::Controller, identifier::Identifier, IdentifierPrefix, SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::de::DeserializeOwned;
@@ -186,6 +185,8 @@ pub fn parse_json_arguments<T: DeserializeOwned>(
 
 #[test]
 pub fn test_parse_json_arguments() {
+    use keri_controller::LocationScheme;
+    
     let input_single = r#"{"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}"#;
     let loc = parse_json_arguments::<LocationScheme>(&[input_single]);
     assert!(loc.is_ok());
