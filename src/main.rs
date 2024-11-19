@@ -52,8 +52,12 @@ enum Commands {
         alias: String,
         #[arg(short, long)]
         keys_file: Option<PathBuf>,
-        #[arg(short, long)]
-        config: Option<PathBuf>,
+        #[arg(long)]
+        witness: Vec<String>,
+        #[arg(long)]
+        watcher: Vec<String>,
+        #[arg(long)]
+        witness_threshold: Option<u64>,
     },
     Kel {
         #[command(subcommand)]
@@ -267,9 +271,29 @@ async fn main() -> Result<(), CliError> {
         Some(Commands::Init {
             alias,
             keys_file,
-            config,
+            witness,
+            watcher,
+            witness_threshold,
         }) => {
-            handle_init(alias, keys_file, config).await?;
+            let witness_threshold = witness_threshold.unwrap_or(0);
+            let witnesses_oobi = if witness.is_empty() {
+                None
+            } else {
+                Some(witness)
+            };
+            let watchers_oobi = if watcher.is_empty() {
+                None
+            } else {
+                Some(watcher)
+            };
+            handle_init(
+                alias,
+                keys_file,
+                witnesses_oobi,
+                watchers_oobi,
+                witness_threshold,
+            )
+            .await?;
         }
         Some(Commands::Kel { command }) => {
             match command {

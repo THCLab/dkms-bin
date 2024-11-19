@@ -7,14 +7,12 @@ use keri_core::{
     event::sections::seal::EventSeal,
     processor::validator::{MoreInfoError, VerificationError},
 };
-// use keri_core::processor::validator::VerificationError;
 use said::SelfAddressingIdentifier;
 use serde::Deserialize;
-use serde_json::{from_value, Value};
 
 use crate::{
     keri::query_tel,
-    utils::{load, load_signer},
+    utils::{load, load_signer, parse_json_arguments},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -84,32 +82,6 @@ pub enum ACDCState {
     NotFound,
 }
 
-fn extract_objects(value: &serde_json::Value) -> Result<Vec<Oobi>, VerifyHandleError> {
-    match value {
-        Value::Array(vec) => vec
-            .into_iter()
-            .fold(Ok(vec![]), |mut acc, el| match extract_objects(el) {
-                Ok(mut obj) => {
-                    acc.as_mut().map(|oobis| oobis.append(&mut obj));
-                    acc
-                }
-                Err(e) => return Err(e),
-            }),
-        Value::Object(map) => match from_value::<Oobi>(Value::Object(map.clone())) {
-            Ok(value) => Ok(vec![value]),
-            Err(e) => {
-                return Err(VerifyHandleError::WrongOobiFormat(format!(
-                    "Provided json isn't valid oobi: {}",
-                    serde_json::to_string(&value).unwrap()
-                )))
-            }
-        },
-        _ => Err(VerifyHandleError::WrongOobiFormat(
-            "Expected oobi or list of oobis".to_string(),
-        )),
-    }
-}
-
 pub async fn handle_verify(
     alias: &str,
     oobi: &[&str],
@@ -118,26 +90,8 @@ pub async fn handle_verify(
     let who_id = load(alias).unwrap();
 
     // parse and resolve oobis
-    let oobis: Vec<Oobi> = oobi.iter().fold(Ok(vec![]), |mut acc, oobi_str| {
-        match serde_json::from_str::<Value>(&oobi_str) {
-            Ok(ok) => {
-                let objects = extract_objects(&ok);
-                match objects {
-                    Ok(mut obj) => {
-                        acc.as_mut().map(|oobis| oobis.append(&mut obj));
-                    }
-                    Err(e) => {
-                        acc = Err(e);
-                    }
-                };
-                acc
-            }
-            Err(_e) => Err(VerifyHandleError::WrongOobiFormat(format!(
-                "Provided json isn't valid oobi: {}",
-                oobi_str
-            ))),
-        }
-    })?;
+    let oobis = parse_json_arguments::<Oobi>(oobi)
+        .map_err(|e| VerifyHandleError::WrongOobiFormat(e.to_string()))?;
     for oobi in oobis {
         let _ = who_id.resolve_oobi(&oobi).await;
         match who_id.send_oobi_to_watcher(who_id.id(), &oobi).await {

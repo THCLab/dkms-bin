@@ -13,14 +13,15 @@ use ed25519_dalek::SigningKey;
 
 use keri_controller::{
     config::ControllerConfig, controller::Controller, identifier::Identifier, BasicPrefix,
-    CesrPrimitive, LocationScheme, SeedPrefix,
+    CesrPrimitive, LocationScheme, Oobi, SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     keri::{setup_identifier, KeriError},
-    utils, CliError,
+    utils::{self, parse_json_arguments},
+    CliError,
 };
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -100,37 +101,24 @@ fn ask_for_confirmation(prompt: &str) -> bool {
 pub async fn handle_init(
     alias: String,
     keys_file: Option<PathBuf>,
-    config_file: Option<PathBuf>,
+    witnesses: Option<Vec<String>>,
+    watchers: Option<Vec<String>>,
+    witness_threshold: u64,
 ) -> Result<(), CliError> {
-    let kel_config = match config_file {
-        Some(config_path) => match KelConfig::load_from_file(&config_path) {
-            Ok(config) => config,
-            Err(e) => {
-                println!("{} init failed. {}", alias, e);
-                process::exit(1);
-            }
-        },
-        None => {
-            // Check if file exists in default location
-            let mut config_path = utils::load_homedir()?;
-            config_path.push(".dkms-dev-cli");
-            config_path.push(&alias);
-            create_dir_all(&config_path).unwrap();
-            config_path.push("config.yaml");
-            if config_path.is_file() {
-                KelConfig::from_config_file(config_path).unwrap()
-            } else if ask_for_confirmation(&format!(
-                "Config file not found. Do you want to create one in `{}`? (y/N)",
-                &config_path.to_str().unwrap()
-            )) {
-                let config = KelConfig::default();
-                let f = File::create(config_path).unwrap();
-                serde_yaml::to_writer(f, &config).unwrap();
-                config
-            } else {
-                process::exit(1);
-            }
-        }
+    let witnesses_oobi = witnesses.map(|list| {
+        parse_json_arguments::<LocationScheme>(
+            &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
+        )
+    }).transpose()?;
+    let watchers_oobi = watchers.map(|list| {
+        parse_json_arguments::<LocationScheme>(
+            &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
+        )
+    }).transpose()?;
+    let kel_config = KelConfig {
+        witness: witnesses_oobi,
+        witness_threshold,
+        watcher: watchers_oobi,
     };
 
     let keys = match keys_file {

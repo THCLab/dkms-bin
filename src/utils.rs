@@ -6,7 +6,8 @@ use keri_controller::{
     SeedPrefix,
 };
 use keri_core::signer::Signer;
-use serde_json::json;
+use serde::de::DeserializeOwned;
+use serde_json::{from_value, json, Value};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -137,4 +138,63 @@ pub fn handle_info(alias: &str) -> Result<(), LoadingError> {
 
 pub fn load_homedir() -> Result<PathBuf, LoadingError> {
     home::home_dir().ok_or(LoadingError::HomePath)
+}
+
+#[derive(Debug, Error)]
+pub enum ExtractionError {
+    #[error("Provided json doesn't match expected type")]
+    InvalidType(String),
+    #[error("Provided string isn't valid json")]
+    InvalidJson(String),
+    #[error("Expected element or list of elements")]
+    UnexpectedJsonValue,
+}
+
+pub fn extract_objects<T: DeserializeOwned>(
+    value: &serde_json::Value,
+) -> Result<Vec<T>, ExtractionError> {
+    match value {
+        Value::Array(vec) => vec
+            .into_iter()
+            .fold(Ok(vec![]), |mut acc, el| match extract_objects(el) {
+                Ok(mut obj) => {
+                    let _ = acc.as_mut().map(|oobis| oobis.append(&mut obj));
+                    acc
+                }
+                Err(e) => return Err(e),
+            }),
+        Value::Object(map) => match from_value::<T>(Value::Object(map.clone())) {
+            Ok(value) => Ok(vec![value]),
+            Err(_e) => {
+                return Err(ExtractionError::InvalidType(
+                    serde_json::to_string(&value).unwrap(),
+                ))
+            }
+        },
+        _ => Err(ExtractionError::UnexpectedJsonValue),
+    }
+}
+
+pub fn parse_json_arguments<T: DeserializeOwned>(
+    input_oobis: &[&str],
+) -> Result<Vec<T>, ExtractionError> {
+    let oobis: Vec<T> = input_oobis.iter().fold(Ok(vec![]), |mut acc, oobi_str| {
+        match serde_json::from_str::<Value>(&oobi_str) {
+            Ok(ok) => {
+                let objects = crate::utils::extract_objects(&ok);
+
+                match objects {
+                    Ok(mut obj) => {
+                        let _ = acc.as_mut().map(|oobis| oobis.append(&mut obj));
+                    }
+                    Err(e) => {
+                        acc = Err(e);
+                    }
+                };
+                acc
+            }
+            Err(_e) => Err(ExtractionError::InvalidJson(oobi_str.to_string())),
+        }
+    })?;
+    Ok(oobis)
 }
