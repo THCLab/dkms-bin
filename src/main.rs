@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use cesrox::primitives::codes::seed::SeedCode;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use config_file::ConfigFileError;
 use init::handle_init;
 use kel::{handle_get_alias_kel, handle_get_identifier_kel, handle_kel_query, handle_rotate};
@@ -39,9 +39,6 @@ mod verify;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Optional name to operate on
-    name: Option<String>,
-
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -61,36 +58,41 @@ enum Commands {
         #[arg(long)]
         witness_threshold: Option<u64>,
     },
+    /// Manage Key Event Log
     Kel {
         #[command(subcommand)]
         command: KelCommands,
     },
+    /// Manage Transaction Event Log
     Tel {
         #[command(subcommand)]
         command: TelCommands,
     },
+    /// Generates messages for communication with Mesagkesto
     Mesagkesto {
         #[command(subcommand)]
         command: MesagkestoCommands,
     },
-    /// Returns saved oobis of provided `alias`
+    /// Manage saved OOBIs
     Oobi {
         #[command(subcommand)]
         command: OobiCommands,
     },
+    /// Computes Self Addressing Identifier
     Said {
         #[command(subcommand)]
         command: SaidCommands,
     },
-    Whoami {
-        alias: String,
-    },
+    /// Shows information about identifier of given alias
+    Whoami { alias: String },
+    /// Sign provided data and returns it in CESR format
     Sign {
         #[arg(short, long)]
         alias: String,
         #[arg(short, long)]
         data: String,
     },
+    /// Verifies provided CESR stream
     Verify {
         #[arg(short, long)]
         alias: String,
@@ -112,7 +114,9 @@ enum Commands {
         #[arg(short, long, requires = "code")]
         secret_key: Option<String>,
     },
+    /// Shows information about working environment
     Info,
+    /// Lists all created aliases along with their identifiers
     List,
 }
 
@@ -134,16 +138,19 @@ pub enum MesagkestoCommands {
 
 #[derive(Subcommand)]
 pub enum TelCommands {
+    /// Init Transaction Event Log for given alias
     Incept {
         #[arg(short, long)]
         alias: String,
     },
+    /// Issue credential
     Issue {
         #[arg(short, long)]
         alias: String,
         #[arg(short, long)]
         credential_json: String,
     },
+    /// Search Transaction Event Log event
     Query {
         #[arg(short, long)]
         alias: String,
@@ -154,6 +161,7 @@ pub enum TelCommands {
         #[arg(short, long)]
         said: String,
     },
+    /// Returns OOBI of TEL of given alias
     Oobi {
         #[arg(short, long)]
         alias: String,
@@ -162,12 +170,14 @@ pub enum TelCommands {
 
 #[derive(Subcommand)]
 pub enum KelCommands {
+    /// Rotate identifiers keys
     Rotate {
         #[arg(short, long)]
         alias: String,
         #[arg(short = 'c', long)]
         rotation_config: Option<PathBuf>,
     },
+    /// Find Key Event Log
     Get {
         #[clap(flatten)]
         group: KelGettingGroup,
@@ -197,6 +207,7 @@ pub struct KelGettingGroup {
 
 #[derive(Subcommand)]
 pub enum OobiCommands {
+    /// Returns saved OOBIs of provided alias
     Get {
         #[arg(short, long)]
         alias: String,
@@ -221,6 +232,7 @@ pub enum OobiRoles {
 
 #[derive(Subcommand)]
 pub enum SaidCommands {
+    // Computes the SAID of the provided JSON file and replaces the d field with it
     SAD {
         #[arg(short, long)]
         file: PathBuf,
@@ -430,10 +442,8 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                         .decode(&sk_str)
                         .map_err(|_| CliError::B64Error(sk_str.to_string()));
                     match (code, sk) {
-                        (Ok(code), Ok(sk)) => {
-                                convert_to_seed(code, sk)
-                                    .map_err( |e| CliError::SecretKeyError(sk_str, e))
-                        },
+                        (Ok(code), Ok(sk)) => convert_to_seed(code, sk)
+                            .map_err(|e| CliError::SecretKeyError(sk_str, e)),
                         (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => Err(e),
                     }
                 }
@@ -495,7 +505,10 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             let table = builder.build().with(Style::blank()).to_string();
             println!("{}", table);
         }
-        None => {}
+        None => {
+            // If no subcommand is provided, display the help message
+            Cli::command().print_help().unwrap();
+        }
     };
     Ok(())
 }

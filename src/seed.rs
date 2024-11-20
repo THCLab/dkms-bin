@@ -2,8 +2,6 @@ use cesrox::primitives::codes::seed::SeedCode;
 use ed25519_dalek::SigningKey;
 use keri_controller::{CesrPrimitive, SeedPrefix};
 
-use crate::CliError;
-
 pub fn generate_seed() -> String {
     let sk = SigningKey::generate(&mut rand::rngs::OsRng);
     let seed = SeedPrefix::RandomSeed256Ed25519(sk.as_bytes().to_vec());
@@ -11,7 +9,10 @@ pub fn generate_seed() -> String {
     CesrPrimitive::to_str(&seed)
 }
 
-pub fn convert_to_seed(code: SeedCode, secret_key: Vec<u8>) -> Result<String, keri_core::prefix::error::Error> {
+pub fn convert_to_seed(
+    code: SeedCode,
+    secret_key: Vec<u8>,
+) -> Result<String, keri_core::prefix::error::Error> {
     let seed = SeedPrefix::new(code, secret_key);
     // check if seed is ok
     seed.derive_key_pair()?;
