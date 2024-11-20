@@ -2,21 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.1] - 2024-11-15
+## [0.3.0] - 2024-11-20
 
 ### 🚀 Features
 
 - Add verify command
+- Add list and info commands
+
+### 🐛 Bug Fixes
+
+- Rename info to whoami
+- Better error messages
+- Add VerificationStatus enum
+- Remove config flag from init command
+- Return proper exit code from verify
 
 ### 🚜 Refactor
 
 - Remove unwraps
 - Better error messages
 - Minor changes
+- Fix clippy warnings
+- Better list command output
 
 ### ⚙️ Miscellaneous Tasks
 
 - Create README.md
+- Release 0.2.1 version
 
 ### Reformat
 
