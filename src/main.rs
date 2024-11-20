@@ -284,7 +284,7 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             watcher,
             witness_threshold,
         }) => {
-            let witness_threshold = witness_threshold.unwrap_or(0);
+            let witness_threshold = witness_threshold.unwrap_or(1);
             let witnesses_oobi = if witness.is_empty() {
                 None
             } else {
@@ -468,10 +468,9 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
         }
         Some(Commands::List) => {
             let working_directory = working_directory()?;
+            let mut builder = Builder::new();
+            builder.push_record(["ALIAS", "IDENTIFIER"]);
             if let Ok(contents) = fs::read_dir(&working_directory) {
-
-                let mut builder = Builder::new();
-                builder.push_record(["ALIAS", "IDENTIFIER"]);
                 for entry in contents {
                     let entry = entry?;
                     let metadata = entry.metadata()?;
@@ -484,16 +483,13 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                             id_path.push("id");
                             let identifier = fs::read_to_string(id_path)
                                 .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))?;
-                            builder.push_record([alias.to_string(), identifier.to_string() ]);
-
+                            builder.push_record([alias.to_string(), identifier.to_string()]);
                         }
                     }
-                };
-                let table = builder.build()
-                    .with(Style::blank())
-                    .to_string();
-                print!("{}", table);
+                }
             };
+            let table = builder.build().with(Style::blank()).to_string();
+            println!("{}", table);
         }
         None => {}
     };

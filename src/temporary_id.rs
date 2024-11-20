@@ -4,7 +4,8 @@ use keri_controller::{identifier::Identifier, LocationScheme};
 
 use crate::{
     init::{handle_new_id, KelConfig, KeysConfig},
-    utils::working_directory, CliError,
+    utils::working_directory,
+    CliError,
 };
 
 pub(crate) async fn create_temporary_id(
