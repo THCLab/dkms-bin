@@ -1,6 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
+use cesrox::primitives::codes::seed::SeedCode;
 use clap::{Parser, Subcommand};
 use config_file::ConfigFileError;
 use init::handle_init;
@@ -106,9 +107,9 @@ enum Commands {
     /// If no arguments it generates Ed25519 secret key.
     #[clap(verbatim_doc_comment)]
     Seed {
-        #[arg(short, long)]
+        #[arg(short, long, requires = "secret_key")]
         code: Option<String>,
-        #[arg(short, long)]
+        #[arg(short, long, requires = "code")]
         secret_key: Option<String>,
     },
     Info,
@@ -252,8 +253,8 @@ pub enum CliError {
     LoadingError(#[from] LoadingError),
     #[error("Unparsable identifier: {0}")]
     UnparsableIdentifier(String),
-    #[error("Wrong secret key provided")]
-    SecretKeyError,
+    #[error("The provided string {0} is not valid secret key. {1}. Please verify your input.")]
+    SecretKeyError(String, keri_core::prefix::error::Error),
     #[error("Invalid base64: {0}")]
     B64Error(String),
     #[error("Invalid seed code: {0}")]
@@ -421,15 +422,18 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                 (None, None) => Ok(generate_seed()),
                 (None, Some(_sk)) => Ok("Code needs to be provided".to_string()),
                 (Some(_code), None) => Ok("Key needs to be provided".to_string()),
-                (Some(code), Some(sk)) => {
+                (Some(code), Some(sk_str)) => {
                     let code = code
-                        .parse()
+                        .parse::<SeedCode>()
                         .map_err(|_e| CliError::SeedError(code.to_string()));
                     let sk = BASE64_STANDARD
-                        .decode(&sk)
-                        .map_err(|_| CliError::B64Error(sk.to_string()));
+                        .decode(&sk_str)
+                        .map_err(|_| CliError::B64Error(sk_str.to_string()));
                     match (code, sk) {
-                        (Ok(code), Ok(sk)) => convert_to_seed(code, sk),
+                        (Ok(code), Ok(sk)) => {
+                                convert_to_seed(code, sk)
+                                    .map_err( |e| CliError::SecretKeyError(sk_str, e))
+                        },
                         (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => Err(e),
                     }
                 }
