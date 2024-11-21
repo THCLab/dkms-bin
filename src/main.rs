@@ -275,6 +275,8 @@ pub enum CliError {
     UnparsableOobi(#[from] ExtractionError),
     #[error("{0}")]
     Verification(VerificationStatus),
+    #[error("Invalid input. Only valid json can be signed")]
+    JsonExpected,
 }
 
 #[tokio::main]

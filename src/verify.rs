@@ -17,8 +17,6 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyHandleError {
-    // #[error("Signature doesn't match")]
-    // FaultySignature,
     #[error("Unknown identifier: {0}. You can provide its oobi with --oobi option")]
     MissingOobi(IdentifierPrefix),
     #[error("Wrong signature format: {0}")]
@@ -27,7 +25,8 @@ pub enum VerifyHandleError {
     WrongOobiFormat(String),
     #[error("{0}")]
     VerError(VerificationErrorWrapper),
-
+    #[error("The message contains unexpected characters at the end.")]
+    RemainingCESR(String),
     #[error(transparent)]
     SendingError(#[from] SendingError),
     #[error("{0}")]
@@ -105,7 +104,12 @@ pub async fn handle_verify(
     }
 
     // Parse cesr stream of message
-    let (_rest, cesr) = cesrox::parse(message.as_bytes()).unwrap();
+    let (rest, cesr) = cesrox::parse(message.as_bytes()).unwrap();
+    if !rest.is_empty() {
+        return Err(VerifyHandleError::RemainingCESR(
+            String::from_utf8(rest.to_vec()).unwrap(),
+        ));
+    };
     let attachments = cesr.attachments;
     if !attachments.is_empty() {
         match who_id.verify_from_cesr(&message) {

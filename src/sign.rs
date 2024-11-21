@@ -5,6 +5,10 @@ use crate::{
 };
 
 pub fn handle_sign(alias: String, data: &str) -> Result<String, CliError> {
+    // check if provided string is valid json
+    if let Err(_err) = serde_json::from_str::<serde_json::Value>(data) {
+        return Err(CliError::JsonExpected);
+    };
     let cont = load(&alias)?;
     let sk = load_signer(&alias)?;
 
