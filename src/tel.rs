@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use crate::{
     keri::{issue, query_tel},
+    said::SaidError,
     utils::{load, load_signer, working_directory},
     CliError,
 };
@@ -35,7 +36,8 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
             .get("d")
             .and_then(|v| v.as_str())
             .ok_or(CliError::MissingDigest)?;
-        let said: SelfAddressingIdentifier = digest.parse().unwrap();
+        let said: SelfAddressingIdentifier =
+            digest.parse().map_err(|e| SaidError::InvalidSaid(e))?;
 
         let signer = Arc::new(load_signer(alias)?);
         issue(&mut id, said, signer).await?;

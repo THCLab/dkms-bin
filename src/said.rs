@@ -13,6 +13,8 @@ use crate::CliError;
 pub enum SaidError {
     #[error("Missing `d` field in provided json")]
     MissingSaidField,
+    #[error("Invalid SAID. {0}")]
+    InvalidSaid(said::error::Error),
     #[error("Serde_json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
 }

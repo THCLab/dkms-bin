@@ -249,11 +249,11 @@ pub enum CliError {
     FileError(#[from] std::io::Error),
     #[error("Path error: {0}")]
     PathError(String),
-    #[error("Missing digest field")]
+    #[error("Missing 'd' field")]
     MissingDigest,
     #[error(transparent)]
     MesagkestoError(#[from] MesagkestoError),
-    #[error("Said error: {0}")]
+    #[error("Wrong 'd' field value. {0}")]
     SaidError(#[from] SaidError),
     #[error("Error: {0}")]
     NotReady(String),
