@@ -5,9 +5,9 @@ use cesrox::primitives::codes::seed::SeedCode;
 use clap::{CommandFactory, Parser, Subcommand};
 use config_file::ConfigFileError;
 use init::handle_init;
-use kel::{handle_get_alias_kel, handle_get_identifier_kel, handle_kel_query, handle_rotate};
+use kel::{handle_kel_query, handle_rotate};
 use keri::KeriError;
-use keri_controller::{IdentifierPrefix, LocationScheme};
+use keri_controller::{identifier::query::WatcherResponseError, IdentifierPrefix};
 use mesagkesto::MesagkestoError;
 use resolve::handle_resolve;
 use said::SaidError;
@@ -178,24 +178,18 @@ pub enum KelCommands {
         rotation_config: Option<PathBuf>,
     },
     /// Find Key Event Log
-    Get {
-        #[clap(flatten)]
-        group: KelGettingGroup,
-        /// Identifier OOBI
-        #[clap(short, long)]
-        oobi: Option<String>,
-        /// Watcher OOBI
-        #[clap(short, long)]
-        watcher_oobi: Option<String>,
-    },
-    Query {
+    Find {
+        /// Alias of the identifier making the request
         #[arg(short, long)]
         alias: String,
+        /// The identifier to be searched
         #[arg(short, long)]
         identifier: String,
+        /// Optional OOBI of the identifier to search for
+        #[arg(short, long)]
+        oobi: Option<String>,
     },
 }
-
 #[derive(Debug, clap::Args)]
 #[group(required = true, multiple = false)]
 pub struct KelGettingGroup {
@@ -277,6 +271,8 @@ pub enum CliError {
     Verification(VerificationStatus),
     #[error("Invalid input. Only valid json can be signed")]
     JsonExpected,
+    #[error("{0:?}")]
+    KelGetting(Vec<WatcherResponseError>),
 }
 
 #[tokio::main]
@@ -319,60 +315,22 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             )
             .await?;
         }
-        Some(Commands::Kel { command }) => {
-            match command {
-                KelCommands::Query { alias, identifier } => {
-                    let identifier: IdentifierPrefix = identifier.parse().unwrap();
-                    match handle_kel_query(&alias, &identifier).await {
-                        Ok(kel) => {
-                            println!("{}", kel);
-                        }
-                        Err(_e) => println!("Kel not ready yet"),
-                    }
-                }
-                KelCommands::Rotate {
-                    alias,
-                    rotation_config,
-                } => {
-                    handle_rotate(&alias, rotation_config).await.unwrap();
-                }
-                KelCommands::Get {
-                    group,
-                    oobi,
-                    watcher_oobi,
-                } => {
-                    match (group.alias, group.identifier) {
-                        (None, Some(id_str)) => {
-                            let id: IdentifierPrefix = id_str
-                                .parse()
-                                .map_err(|_e| CliError::UnparsableIdentifier(id_str.to_string()))?;
-
-                            match (oobi, watcher_oobi) {
-                            (None, None) => println!("Missing OOBI of identifier that need to be find and watcher OOBI"),
-                            (None, Some(_)) => println!("Missing OOBI of identifier that need to be find"),
-                            (Some(_), None) => println!("Missing watcher OOBI"),
-                            (Some(oobi), Some(watcher_oobi)) => {
-                                let watcher_oobi: LocationScheme = serde_json::from_str(&watcher_oobi).expect("Can't parse watcher OOBI");
-                                let kel = handle_get_identifier_kel(&id, oobi, watcher_oobi).await?;
-                                match kel {
-                                    Some(kel) => println!("{}", kel),
-                                    None => println!("\nNo kel of {} found", &id),
-                                };
-                            },
-                        };
-                        }
-                        (Some(alias), None) => {
-                            let kel = handle_get_alias_kel(&alias).await?;
-                            match kel {
-                                Some(kel) => println!("{}", kel),
-                                None => println!("\nNo kel of {} locally", alias),
-                            };
-                        }
-                        _ => unreachable!(),
-                    };
-                }
+        Some(Commands::Kel { command }) => match command {
+            KelCommands::Find {
+                alias,
+                identifier,
+                oobi,
+            } => {
+                let identifier: IdentifierPrefix = identifier.parse().unwrap();
+                println!("{}", handle_kel_query(&alias, &identifier, oobi).await?);
             }
-        }
+            KelCommands::Rotate {
+                alias,
+                rotation_config,
+            } => {
+                handle_rotate(&alias, rotation_config).await.unwrap();
+            }
+        },
         Some(Commands::Mesagkesto { command }) => match command {
             MesagkestoCommands::Exchange {
                 content,

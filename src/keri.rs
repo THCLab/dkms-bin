@@ -201,19 +201,6 @@ pub async fn query_tel(
     Ok(())
 }
 
-pub async fn query_kel(
-    about_who: &IdentifierPrefix,
-    id: &Identifier,
-    km: Arc<Signer>,
-) -> Result<(), KeriError> {
-    for watcher in id.watchers()? {
-        let qry = id.query_full_log(about_who, watcher)?;
-        let signature = SelfSigningPrefix::Ed25519Sha512(km.sign(&qry.encode()?)?);
-        id.finalize_query(vec![(qry, signature)]).await;
-    }
-    Ok(())
-}
-
 pub async fn rotate(
     id: &mut Identifier,
     current_signer: Arc<Signer>,

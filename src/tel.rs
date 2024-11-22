@@ -36,8 +36,7 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
             .get("d")
             .and_then(|v| v.as_str())
             .ok_or(CliError::MissingDigest)?;
-        let said: SelfAddressingIdentifier =
-            digest.parse().map_err(|e| SaidError::InvalidSaid(e))?;
+        let said: SelfAddressingIdentifier = digest.parse().map_err(SaidError::InvalidSaid)?;
 
         let signer = Arc::new(load_signer(alias)?);
         issue(&mut id, said, signer).await?;

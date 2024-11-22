@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyHandleError {
-    #[error("Unknown identifier: {0}. You can provide its oobi with --oobi option")]
+    #[error("Unknown oobi of identifier {0}. You can provide its oobi with --oobi option")]
     MissingOobi(IdentifierPrefix),
     #[error("Wrong signature format: {0}")]
     WrongSignatureFormat(String),

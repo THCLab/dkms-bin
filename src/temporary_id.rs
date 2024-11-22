@@ -8,7 +8,7 @@ use crate::{
     CliError,
 };
 
-pub(crate) async fn create_temporary_id(
+pub(crate) async fn _create_temporary_id(
     watcher_oobi: LocationScheme,
 ) -> Result<(Identifier, KeysConfig), CliError> {
     let mut store_path = working_directory()?;
@@ -30,7 +30,7 @@ pub(crate) async fn create_temporary_id(
         .map(|id| (id, keys))
 }
 
-pub(crate) fn clear_temporary_id() -> Result<(), CliError> {
+pub(crate) fn _clear_temporary_id() -> Result<(), CliError> {
     let mut store_path = working_directory()?;
     store_path.push("default");
     Ok(fs::remove_dir_all(store_path)?)

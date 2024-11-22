@@ -7,8 +7,8 @@ use std::{
 
 use crate::{
     keri::KeriError,
-    temporary_id::{clear_temporary_id, create_temporary_id},
-    utils::working_directory,
+    utils::{parse_json_arguments, working_directory},
+    verify::VerifyHandleError,
 };
 use ed25519_dalek::SigningKey;
 use figment::{
@@ -16,14 +16,18 @@ use figment::{
     Figment,
 };
 use keri_controller::{
-    identifier::query::QueryResponse, BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme,
-    Oobi, SeedPrefix, SelfSigningPrefix,
+    identifier::{
+        query::{QueryResponse, WatcherResponseError},
+        Identifier,
+    },
+    BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
+    SelfSigningPrefix,
 };
 use keri_core::{actor::prelude::Message, signer::Signer};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    keri::{query_kel, rotate},
+    keri::rotate,
     utils::{load, load_next_signer, load_signer},
     CliError,
 };
@@ -55,20 +59,49 @@ impl Default for RotationConfig {
 pub async fn handle_kel_query(
     alias: &str,
     about_who: &IdentifierPrefix,
+    oobi: Option<String>,
 ) -> Result<String, CliError> {
-    let id = load(alias)?;
+    let id = Arc::new(load(alias)?);
     let signer = Arc::new(load_signer(alias)?);
 
-    query_kel(about_who, &id, signer)
-        .await
-        .map_err(|e| CliError::NotReady(e.to_string()))?;
-    let kel = id
-        .get_kel(about_who)
-        .ok_or(CliError::UnknownIdentifier(about_who.to_str()))?;
-    let kel_str = kel
-        .into_iter()
-        .flat_map(|kel| Message::Notice(kel).to_cesr().unwrap());
-    Ok(String::from_utf8(kel_str.collect()).unwrap())
+    let out = handle_get_identifier_kel(id.clone(), signer, &about_who, oobi).await;
+    Ok(match out {
+        Ok(Some(kel)) => format!("{}", kel),
+        Ok(None) => {
+            format!("Unknown identifier {}", about_who)
+        }
+        Err(err) => match err {
+            CliError::KelGetting(vec) => {
+                let err = vec
+                    .iter()
+                    .map(|e| {
+                        match e {
+                            WatcherResponseError::KELNotFound(identifier_prefix) => {
+                                // check if identifier oobi is known
+                                let oobis = id
+                                    .clone()
+                                    .get_end_role(
+                                        &identifier_prefix,
+                                        keri_core::oobi::Role::Witness,
+                                    )
+                                    .unwrap();
+                                if oobis.is_empty() {
+                                    VerifyHandleError::MissingOobi(identifier_prefix.clone())
+                                        .to_string()
+                                } else {
+                                    format!("{}", e.to_string())
+                                }
+                            }
+                            _ => e.to_string(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(". ");
+                format!("{}", err)
+            }
+            _ => format!("{}", err),
+        },
+    })
 }
 
 pub async fn handle_rotate(alias: &str, config_path: Option<PathBuf>) -> Result<(), CliError> {
@@ -128,7 +161,7 @@ pub async fn handle_rotate(alias: &str, config_path: Option<PathBuf>) -> Result<
 }
 
 /// Returns KEL of identifier of provided alias that is stored locally.
-pub async fn handle_get_alias_kel(alias: &str) -> Result<Option<String>, CliError> {
+pub async fn _handle_get_alias_kel(alias: &str) -> Result<Option<String>, CliError> {
     let id = load(alias)?;
 
     let kel = id
@@ -140,31 +173,45 @@ pub async fn handle_get_alias_kel(alias: &str) -> Result<Option<String>, CliErro
     Ok(Some(String::from_utf8(kel_str.collect()).unwrap()))
 }
 
-/// Queries provided watcher about identifier's KEL, and returns it.
+/// Queries identifier's watchers about identifier's KEL, and returns it. It will
+/// query 5 times for each watcher, if KEL wasn't found, returns proper message.
 pub async fn handle_get_identifier_kel(
+    id: Arc<Identifier>,
+    signer: Arc<Signer>,
     identifier: &IdentifierPrefix,
-    oobi: String,
-    watcher_oobi: LocationScheme,
+    oobi: Option<String>,
 ) -> Result<Option<String>, CliError> {
-    let watcher_id = watcher_oobi.eid.clone();
-    let (id, keys_conf) = create_temporary_id(watcher_oobi).await?;
-    let signer = Arc::new(Signer::new_with_seed(&keys_conf.current).unwrap());
+    if let Some(oobi) = oobi {
+        for oobi in parse_json_arguments::<Oobi>(&[&oobi])? {
+            id.send_oobi_to_watcher(id.id(), &oobi)
+                .await
+                .map_err(KeriError::ControllerError)?;
+        }
+    };
 
-    for oobi in serde_json::from_str::<Vec<Oobi>>(&oobi).unwrap() {
-        id.send_oobi_to_watcher(id.id(), &oobi)
-            .await
+    for watcher_id in id
+        .watchers()
+        .map_err(super::keri::KeriError::ControllerError)?
+    {
+        let qry = id
+            .query_full_log(identifier, watcher_id.clone())
             .map_err(KeriError::ControllerError)?;
-    }
-
-    let qry = id.query_full_log(identifier, watcher_id.clone()).unwrap();
-    let signature = SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
-    let (mut qry_reps, _errs) = id.finalize_query(vec![(qry, signature)]).await;
-    while let QueryResponse::NoUpdates = qry_reps {
-        let qry = id.query_full_log(identifier, watcher_id.clone()).unwrap();
         let signature =
             SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
-        let (qry_resp, _errs) = id.finalize_query(vec![(qry, signature)]).await;
-        qry_reps = qry_resp;
+        let (mut qry_reps, mut errs) = id.finalize_query(vec![(qry, signature)]).await;
+        let mut loop_count = 0;
+        while let QueryResponse::NoUpdates = qry_reps {
+            if loop_count > 5 {
+                return Err(CliError::KelGetting(errs));
+            };
+            let qry = id.query_full_log(identifier, watcher_id.clone()).unwrap();
+            let signature =
+                SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
+            let (qry_resp, new_errs) = id.finalize_query(vec![(qry, signature)]).await;
+            errs = new_errs;
+            qry_reps = qry_resp;
+            loop_count += 1;
+        }
     }
 
     let kel = id
@@ -173,6 +220,5 @@ pub async fn handle_get_identifier_kel(
     let kel_str = kel
         .into_iter()
         .flat_map(|kel| Message::Notice(kel).to_cesr().unwrap());
-    clear_temporary_id()?;
     Ok(Some(String::from_utf8(kel_str.collect()).unwrap()))
 }
