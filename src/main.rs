@@ -22,6 +22,7 @@ use verify::handle_verify;
 
 use crate::said::handle_sad;
 
+mod expand;
 mod init;
 mod kel;
 mod keri;
@@ -84,7 +85,9 @@ enum Commands {
         command: SaidCommands,
     },
     /// Shows information about identifier of given alias
-    Whoami { alias: String },
+    Whoami {
+        alias: String,
+    },
     /// Sign provided data and returns it in CESR format
     Sign {
         #[arg(short, long)]
@@ -118,6 +121,10 @@ enum Commands {
     Info,
     /// Lists all created aliases along with their identifiers
     List,
+    /// Transforms CESR data into a human-readable format
+    Expand {
+        cesr: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -465,6 +472,7 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             let table = builder.build().with(Style::blank()).to_string();
             println!("{}", table);
         }
+        Some(Commands::Expand { cesr }) => expand::expand(&cesr),
         None => {
             // If no subcommand is provided, display the help message
             Cli::command().print_help().unwrap();
