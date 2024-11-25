@@ -121,8 +121,9 @@ enum Commands {
     Info,
     /// Lists all created aliases along with their identifiers
     List,
-    /// Transforms CESR data into a human-readable format
+    /// Presents CESR data in a human-readable format
     Expand {
+        /// A CESR string, such as one produced by the issue or sign command
         cesr: String,
     },
 }

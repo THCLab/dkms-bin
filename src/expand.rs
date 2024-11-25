@@ -4,17 +4,59 @@ use cesrox::{
     primitives::{IndexedSignature, PublicKey, Signature, TransferableQuadruple},
 };
 use keri_controller::{BasicPrefix, CesrPrimitive, SelfSigningPrefix};
+use said::{derivation::HashFunctionCode, SelfAddressingIdentifier};
+
+fn readable_self_signing(sig: SelfSigningPrefix) -> String {
+    let description = match &sig {
+        SelfSigningPrefix::Ed25519Sha512(_) => "Ed25519 signature",
+        SelfSigningPrefix::ECDSAsecp256k1Sha256(_) => "ECDSA secp256k1 signature",
+        SelfSigningPrefix::Ed448(_) => "Ed448 signature",
+    };
+    format!(
+        "{} ({})\n",
+        sig.to_str(),
+        description
+    )
+}
+
+fn _readable_basic(bp: BasicPrefix) -> String {
+    let description = match &bp {
+        BasicPrefix::ECDSAsecp256k1NT(_public_key) | BasicPrefix::ECDSAsecp256k1(_public_key) => "ECDSA secp256k1 public verification or encryption key",
+        BasicPrefix::Ed25519NT(_public_key) | BasicPrefix::Ed25519(_public_key) => "Ed25519 public verification key",
+        BasicPrefix::Ed448NT(_public_key) | BasicPrefix::Ed448(_public_key) => "Ed448 public verification key",
+        BasicPrefix::X25519(_public_key) => "X25519 public encryption key",
+        BasicPrefix::X448(_public_key) => "X448 public encryption key",
+    };
+    format!(
+        "{} ({})\n",
+        bp.to_str(),
+        description
+    )
+}
+
+fn readable_self_addressing(sai: SelfAddressingIdentifier) -> String {
+    let description = match HashFunctionCode::from(&sai.derivation) {
+        HashFunctionCode::Blake3_256 => "Blake3-256 Digest",
+        HashFunctionCode::Blake2B256(_) => "Blake2b-256 Digest",
+        HashFunctionCode::Blake2S256(_) => "Blake2s-256 Digest",
+        HashFunctionCode::SHA3_256 => "SHA3-256 Digest",
+        HashFunctionCode::SHA2_256 => "SHA2-256 Digest",
+        HashFunctionCode::Blake3_512 => "Blake3-512 Digest",
+        HashFunctionCode::SHA3_512 => "SHA3-512 Digest",
+        HashFunctionCode::Blake2B512 => "Blake2b-512 Digest",
+        HashFunctionCode::SHA2_512 => "SHA2-512 Digest",
+    };
+    format!(
+        "{} ({})",
+        sai.to_str(),
+        description
+    )
+}
 
 fn readable_indexed_signature(indexed: &IndexedSignature) -> String {
     let (code, signature) = indexed;
     let code = code.code;
-    let mut output = "".to_string();
-    let elements = format!(
-        "    {}\n",
-        SelfSigningPrefix::new(code, signature.clone()).to_str()
-    );
-    output.push_str(&elements);
-    output
+    readable_self_signing(SelfSigningPrefix::new(code, signature.to_vec()))
 }
 
 fn readable_signature_group_element(quadruple: TransferableQuadruple) -> String {
@@ -23,7 +65,7 @@ fn readable_signature_group_element(quadruple: TransferableQuadruple) -> String 
     let cesr_primitive = identifier.to_str();
     output.push_str(&format!("    KEL Identifier: {}\n", cesr_primitive));
     output.push_str(&format!("    event number: {}\n", sn));
-    output.push_str(&format!("    event digest: {}\n", digest.to_str()));
+    output.push_str(&format!("    event digest: {}\n", readable_self_addressing(digest.into())));
     signatures.sort_by(|a, b| a.0.index.current().cmp(&b.0.index.current()));
     if signatures.len() == 1 {
         output.push_str("    Signature: ")
@@ -48,7 +90,7 @@ fn readable_nontrans_receipt(pair: (PublicKey, Signature)) -> String {
     format!(
         "    Identifier: {}\n    Signature: {}",
         identifier,
-        SelfSigningPrefix::new(signature.0, signature.1).to_str()
+        readable_self_signing(SelfSigningPrefix::new(signature.0, signature.1))
     )
 }
 
