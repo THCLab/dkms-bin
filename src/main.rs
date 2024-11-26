@@ -4,19 +4,17 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use cesrox::primitives::codes::seed::SeedCode;
 use clap::{CommandFactory, Parser, Subcommand};
 use config_file::ConfigFileError;
-use init::handle_init;
 use kel::{handle_kel_query, handle_rotate};
 use keri::KeriError;
 use keri_controller::{identifier::query::WatcherResponseError, IdentifierPrefix};
 use mesagkesto::MesagkestoError;
-use resolve::handle_resolve;
 use said::SaidError;
 use seed::{convert_to_seed, generate_seed};
 use sign::handle_sign;
-use tabled::{builder::Builder, settings::Style};
+use subcommands::identifier::{process_identifier_command, IdentifierCommand};
 use tel::{handle_issue, handle_query, handle_tel_oobi};
 use thiserror::Error;
-use utils::{handle_info, working_directory, ExtractionError, LoadingError};
+use utils::{working_directory, ExtractionError, LoadingError};
 use verification_status::VerificationStatus;
 use verify::handle_verify;
 
@@ -31,6 +29,7 @@ mod resolve;
 mod said;
 mod seed;
 mod sign;
+mod subcommands;
 mod tel;
 mod temporary_id;
 mod utils;
@@ -38,56 +37,28 @@ mod verification_status;
 mod verify;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None,)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
-enum Commands {
-    /// Init new signer
-    Init {
-        #[arg(short, long)]
-        alias: String,
-        #[arg(short, long)]
-        keys_file: Option<PathBuf>,
-        #[arg(long)]
-        witness: Vec<String>,
-        #[arg(long)]
-        watcher: Vec<String>,
-        #[arg(long)]
-        witness_threshold: Option<u64>,
-    },
-    /// Manage Key Event Log
+enum LogCommand {
+    /// Manage Key Event Logs (KEL)
     Kel {
         #[command(subcommand)]
         command: KelCommands,
     },
-    /// Manage Transaction Event Log
+    /// Manage Transaction Event Logs (TEL)
     Tel {
         #[command(subcommand)]
         command: TelCommands,
     },
-    /// Generates messages for communication with Mesagkesto
-    Mesagkesto {
-        #[command(subcommand)]
-        command: MesagkestoCommands,
-    },
-    /// Manage saved OOBIs
-    Oobi {
-        #[command(subcommand)]
-        command: OobiCommands,
-    },
-    /// Computes Self Addressing Identifier
-    Said {
-        #[command(subcommand)]
-        command: SaidCommands,
-    },
-    /// Shows information about identifier of given alias
-    Whoami {
-        alias: String,
-    },
+}
+
+#[derive(Subcommand)]
+enum DataCommand {
     /// Sign provided data and returns it in CESR format
     Sign {
         #[arg(short, long)]
@@ -104,6 +75,41 @@ enum Commands {
         #[arg(short, long)]
         message: String,
     },
+    /// Presents CESR data in a human-readable format
+    Expand {
+        /// A CESR string, such as one produced by the issue or sign command
+        cesr: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Manage identifiers
+    Identifier {
+        #[command(subcommand)]
+        command: IdentifierCommand,
+    },
+    /// Manage logs
+    Log {
+        #[command(subcommand)]
+        command: LogCommand,
+    },
+    Data {
+        #[command(subcommand)]
+        command: DataCommand,
+    },
+
+    /// Generates messages for communication with Mesagkesto
+    Mesagkesto {
+        #[command(subcommand)]
+        command: MesagkestoCommands,
+    },
+    /// Computes Self Addressing Identifier
+    Said {
+        #[command(subcommand)]
+        command: SaidCommands,
+    },
+
     /// Generate Seed string from provided code and secret key encoded in base64.
     /// Code specify algorithm to use. Possible values are:
     ///     `A` for Ed25519 private key,
@@ -119,13 +125,6 @@ enum Commands {
     },
     /// Shows information about working environment
     Info,
-    /// Lists all created aliases along with their identifiers
-    List,
-    /// Presents CESR data in a human-readable format
-    Expand {
-        /// A CESR string, such as one produced by the issue or sign command
-        cesr: String,
-    },
 }
 
 #[derive(Subcommand)]
@@ -208,24 +207,6 @@ pub struct KelGettingGroup {
 }
 
 #[derive(Subcommand)]
-pub enum OobiCommands {
-    /// Returns saved OOBIs of provided alias
-    Get {
-        #[arg(short, long)]
-        alias: String,
-        #[command(subcommand)]
-        role: Option<OobiRoles>,
-    },
-    // Resolves provided oobi and saves it
-    Resolve {
-        #[arg(short, long)]
-        alias: String,
-        #[arg(short, long)]
-        file: PathBuf,
-    },
-}
-
-#[derive(Subcommand)]
 pub enum OobiRoles {
     Witness,
     Watcher,
@@ -294,51 +275,100 @@ async fn main() -> Result<(), CliError> {
     Ok(())
 }
 
+async fn process_log_command(command: LogCommand) -> Result<(), CliError> {
+    match command {
+        LogCommand::Kel { command } => {
+            match command {
+                KelCommands::Find {
+                    alias,
+                    identifier,
+                    oobi,
+                } => {
+                    let identifier: IdentifierPrefix = identifier.parse().unwrap();
+                    println!("{}", handle_kel_query(&alias, &identifier, oobi).await?);
+                }
+                KelCommands::Rotate {
+                    alias,
+                    rotation_config,
+                } => {
+                    handle_rotate(&alias, rotation_config).await.unwrap();
+                }
+            };
+            Ok(())
+        }
+        LogCommand::Tel { command } => {
+            match command {
+                TelCommands::Incept { alias } => {
+                    tel::handle_tel_incept(&alias).await?;
+                }
+                TelCommands::Issue {
+                    alias,
+                    credential_json,
+                } => {
+                    handle_issue(&alias, &credential_json).await?;
+                }
+                TelCommands::Query {
+                    alias,
+                    issuer_id,
+                    registry_id,
+                    said,
+                } => {
+                    handle_query(&alias, &said, &registry_id, &issuer_id).await?;
+                }
+                TelCommands::Oobi { alias } => {
+                    handle_tel_oobi(&alias)?;
+                }
+            };
+            Ok(())
+        }
+    }
+}
+
+async fn process_data_command(command: DataCommand) -> Result<(), CliError> {
+    match command {
+        DataCommand::Sign { alias, data } => {
+            println!("{}", handle_sign(alias, &data)?);
+        }
+        DataCommand::Verify {
+            alias,
+            oobi,
+            message,
+        } => {
+            let status = match handle_verify(
+                &alias,
+                &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
+                message,
+            )
+            .await
+            {
+                Ok(result) => VerificationStatus::from(result),
+                Err(e) => VerificationStatus::from(e),
+            };
+            match &status {
+                VerificationStatus::Ok { description: _ } => println!("{}", &status),
+                VerificationStatus::Error { description: _ }
+                | VerificationStatus::Invalid { description: _ } => {
+                    return Err(CliError::Verification(status))
+                }
+            }
+        }
+        DataCommand::Expand { cesr } => expand::expand(&cesr),
+    }
+    Ok(())
+}
+
 async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
     match command {
-        Some(Commands::Init {
-            alias,
-            keys_file,
-            witness,
-            watcher,
-            witness_threshold,
-        }) => {
-            let witness_threshold = witness_threshold.unwrap_or(1);
-            let witnesses_oobi = if witness.is_empty() {
-                None
-            } else {
-                Some(witness)
-            };
-            let watchers_oobi = if watcher.is_empty() {
-                None
-            } else {
-                Some(watcher)
-            };
-            handle_init(
-                alias,
-                keys_file,
-                witnesses_oobi,
-                watchers_oobi,
-                witness_threshold,
-            )
-            .await?;
+        Some(Commands::Identifier { command }) => {
+            process_identifier_command(command).await?;
         }
-        Some(Commands::Kel { command }) => match command {
-            KelCommands::Find {
-                alias,
-                identifier,
-                oobi,
-            } => {
-                let identifier: IdentifierPrefix = identifier.parse().unwrap();
-                println!("{}", handle_kel_query(&alias, &identifier, oobi).await?);
-            }
-            KelCommands::Rotate {
-                alias,
-                rotation_config,
-            } => {
-                handle_rotate(&alias, rotation_config).await.unwrap();
-            }
-        },
+        Some(Commands::Log { command }) => {
+            process_log_command(command).await?;
+        }
+        Some(Commands::Data { command }) => {
+            process_data_command(command).await?;
+        }
+
         Some(Commands::Mesagkesto { command }) => match command {
             MesagkestoCommands::Exchange {
                 content,
@@ -355,47 +385,12 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                 println!("{}", qry);
             }
         },
-        Some(Commands::Oobi { command }) => match command {
-            OobiCommands::Get { role, alias } => match resolve::handle_oobi(&alias, &role) {
-                Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
-                Err(e) => println!("{}", e),
-            },
-            OobiCommands::Resolve { alias, file } => handle_resolve(&alias, file).await?,
-        },
-        Some(Commands::Tel { command }) => match command {
-            TelCommands::Incept { alias } => {
-                tel::handle_tel_incept(&alias).await?;
-            }
-            TelCommands::Issue {
-                alias,
-                credential_json,
-            } => {
-                handle_issue(&alias, &credential_json).await?;
-            }
-            TelCommands::Query {
-                alias,
-                issuer_id,
-                registry_id,
-                said,
-            } => {
-                handle_query(&alias, &said, &registry_id, &issuer_id).await?;
-            }
-            TelCommands::Oobi { alias } => {
-                handle_tel_oobi(&alias)?;
-            }
-        },
         Some(Commands::Said { command }) => match command {
             SaidCommands::SAD { file } => {
                 let sad = handle_sad(file).await?;
                 println!("{}", sad);
             }
         },
-        Some(Commands::Whoami { alias }) => {
-            handle_info(&alias)?;
-        }
-        Some(Commands::Sign { alias, data }) => {
-            println!("{}", handle_sign(alias, &data)?);
-        }
         Some(Commands::Seed { code, secret_key }) => {
             // seed is in b64
             let seed = match (code, secret_key) {
@@ -421,59 +416,10 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                 Err(e) => println!("{}", e),
             }
         }
-        Some(Commands::Verify {
-            alias,
-            oobi,
-            message,
-        }) => {
-            let status = match handle_verify(
-                &alias,
-                &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
-                message,
-            )
-            .await
-            {
-                Ok(result) => VerificationStatus::from(result),
-                Err(e) => VerificationStatus::from(e),
-            };
-            match &status {
-                VerificationStatus::Ok { description: _ } => println!("{}", &status),
-                VerificationStatus::Error { description: _ }
-                | VerificationStatus::Invalid { description: _ } => {
-                    return Err(CliError::Verification(status))
-                }
-            }
-        }
         Some(Commands::Info) => {
             let working_directory = working_directory()?;
             println!("Working directory: {}", working_directory.to_str().unwrap());
         }
-        Some(Commands::List) => {
-            let working_directory = working_directory()?;
-            let mut builder = Builder::new();
-            builder.push_record(["ALIAS", "IDENTIFIER"]);
-            if let Ok(contents) = fs::read_dir(&working_directory) {
-                for entry in contents {
-                    let entry = entry?;
-                    let metadata = entry.metadata()?;
-
-                    // Check if the entry is a directory
-                    if metadata.is_dir() {
-                        if let Some(alias) = entry.file_name().to_str() {
-                            let mut id_path = working_directory.clone();
-                            id_path.push(alias);
-                            id_path.push("id");
-                            let identifier = fs::read_to_string(id_path)
-                                .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))?;
-                            builder.push_record([alias.to_string(), identifier.to_string()]);
-                        }
-                    }
-                }
-            };
-            let table = builder.build().with(Style::blank()).to_string();
-            println!("{}", table);
-        }
-        Some(Commands::Expand { cesr }) => expand::expand(&cesr),
         None => {
             // If no subcommand is provided, display the help message
             Cli::command().print_help().unwrap();

@@ -12,26 +12,24 @@ fn readable_self_signing(sig: SelfSigningPrefix) -> String {
         SelfSigningPrefix::ECDSAsecp256k1Sha256(_) => "ECDSA secp256k1 signature",
         SelfSigningPrefix::Ed448(_) => "Ed448 signature",
     };
-    format!(
-        "{} ({})\n",
-        sig.to_str(),
-        description
-    )
+    format!("{} ({})\n", sig.to_str(), description)
 }
 
 fn _readable_basic(bp: BasicPrefix) -> String {
     let description = match &bp {
-        BasicPrefix::ECDSAsecp256k1NT(_public_key) | BasicPrefix::ECDSAsecp256k1(_public_key) => "ECDSA secp256k1 public verification or encryption key",
-        BasicPrefix::Ed25519NT(_public_key) | BasicPrefix::Ed25519(_public_key) => "Ed25519 public verification key",
-        BasicPrefix::Ed448NT(_public_key) | BasicPrefix::Ed448(_public_key) => "Ed448 public verification key",
+        BasicPrefix::ECDSAsecp256k1NT(_public_key) | BasicPrefix::ECDSAsecp256k1(_public_key) => {
+            "ECDSA secp256k1 public verification or encryption key"
+        }
+        BasicPrefix::Ed25519NT(_public_key) | BasicPrefix::Ed25519(_public_key) => {
+            "Ed25519 public verification key"
+        }
+        BasicPrefix::Ed448NT(_public_key) | BasicPrefix::Ed448(_public_key) => {
+            "Ed448 public verification key"
+        }
         BasicPrefix::X25519(_public_key) => "X25519 public encryption key",
         BasicPrefix::X448(_public_key) => "X448 public encryption key",
     };
-    format!(
-        "{} ({})\n",
-        bp.to_str(),
-        description
-    )
+    format!("{} ({})\n", bp.to_str(), description)
 }
 
 fn readable_self_addressing(sai: SelfAddressingIdentifier) -> String {
@@ -46,11 +44,7 @@ fn readable_self_addressing(sai: SelfAddressingIdentifier) -> String {
         HashFunctionCode::Blake2B512 => "Blake2b-512 Digest",
         HashFunctionCode::SHA2_512 => "SHA2-512 Digest",
     };
-    format!(
-        "{} ({})",
-        sai.to_str(),
-        description
-    )
+    format!("{} ({})", sai.to_str(), description)
 }
 
 fn readable_indexed_signature(indexed: &IndexedSignature) -> String {
@@ -65,7 +59,10 @@ fn readable_signature_group_element(quadruple: TransferableQuadruple) -> String 
     let cesr_primitive = identifier.to_str();
     output.push_str(&format!("    KEL Identifier: {}\n", cesr_primitive));
     output.push_str(&format!("    event number: {}\n", sn));
-    output.push_str(&format!("    event digest: {}\n", readable_self_addressing(digest.into())));
+    output.push_str(&format!(
+        "    event digest: {}\n",
+        readable_self_addressing(digest.into())
+    ));
     signatures.sort_by(|a, b| a.0.index.current().cmp(&b.0.index.current()));
     if signatures.len() == 1 {
         output.push_str("    Signature: ")
@@ -95,7 +92,10 @@ fn readable_nontrans_receipt(pair: (PublicKey, Signature)) -> String {
 }
 
 pub fn expand(cesr: &str) {
-    let no_whitespace = cesr.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    let no_whitespace = cesr
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>();
     let (rest, stream) = parse_many(no_whitespace.as_bytes()).expect("Invalid CESR stream");
     for stream in stream {
         println!(
