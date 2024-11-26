@@ -9,6 +9,7 @@ use subcommands::{
     identifier::{process_identifier_command, IdentifierCommand},
     key::{process_key_command, KeyCommands},
     log::{process_log_command, LogCommand},
+    mesagkesto::{process_mesagkesto_command, MesagkestoCommands},
     said::{process_said_command, SaidCommands},
 };
 use thiserror::Error;
@@ -74,22 +75,6 @@ enum Commands {
 
     /// Shows information about working environment
     Info,
-}
-
-#[derive(Subcommand)]
-pub enum MesagkestoCommands {
-    Exchange {
-        #[arg(short, long)]
-        alias: String,
-        #[arg(short, long)]
-        content: String,
-        #[arg(short, long)]
-        receiver: String,
-    },
-    Query {
-        #[arg(short, long)]
-        alias: String,
-    },
 }
 
 #[derive(Debug, clap::Args)]
@@ -176,22 +161,7 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             process_key_command(command).await?;
         }
 
-        Some(Commands::Mesagkesto { command }) => match command {
-            MesagkestoCommands::Exchange {
-                content,
-                receiver,
-                alias,
-            } => {
-                println!(
-                    "{}",
-                    mesagkesto::handle_exchange(&alias, &content, &receiver)?
-                );
-            }
-            MesagkestoCommands::Query { alias } => {
-                let qry = mesagkesto::handle_pull(&alias)?;
-                println!("{}", qry);
-            }
-        },
+        Some(Commands::Mesagkesto { command }) => process_mesagkesto_command(command).await?,
         Some(Commands::Said { command }) => process_said_command(command).await?,
         Some(Commands::Info) => {
             let working_directory = working_directory()?;
