@@ -5,9 +5,9 @@ use tabled::{builder::Builder, settings::Style};
 
 use crate::{
     init::handle_init,
-    resolve::{self, handle_resolve},
+    resolve::{self, handle_resolve, OobiRoles},
     utils::{handle_info, working_directory, LoadingError},
-    CliError, OobiRoles,
+    CliError,
 };
 
 #[derive(Subcommand)]

@@ -1,9 +1,17 @@
 use std::fs;
 use std::path::PathBuf;
 
+use clap::Subcommand;
 use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi};
 
-use crate::{keri::KeriError, utils::load, CliError, OobiRoles};
+use crate::{keri::KeriError, utils::load, CliError};
+
+#[derive(Subcommand)]
+pub enum OobiRoles {
+    Witness,
+    Watcher,
+    Messagebox,
+}
 
 pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), CliError> {
     let id_cont = load(alias)?;
