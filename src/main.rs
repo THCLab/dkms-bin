@@ -1,15 +1,13 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
-use cesrox::primitives::codes::seed::SeedCode;
 use clap::{CommandFactory, Parser, Subcommand};
 use config_file::ConfigFileError;
 use keri::KeriError;
 use keri_controller::identifier::query::WatcherResponseError;
 use mesagkesto::MesagkestoError;
 use said::SaidError;
-use seed::{convert_to_seed, generate_seed};
 use subcommands::{
     data::{process_data_command, DataCommand},
     identifier::{process_identifier_command, IdentifierCommand},
+    key::{process_key_command, KeyCommands},
     log::{process_log_command, LogCommand},
     said::{process_said_command, SaidCommands},
 };
@@ -52,9 +50,15 @@ enum Commands {
         #[command(subcommand)]
         command: LogCommand,
     },
+    /// Sign, verify
     Data {
         #[command(subcommand)]
         command: DataCommand,
+    },
+
+    Key {
+        #[command(subcommand)]
+        command: KeyCommands,
     },
 
     /// Generates messages for communication with Mesagkesto
@@ -62,25 +66,12 @@ enum Commands {
         #[command(subcommand)]
         command: MesagkestoCommands,
     },
-    /// Computes Self Addressing Identifier
+    /// Computes Self Addressing Identifier (SAID)
     Said {
         #[command(subcommand)]
         command: SaidCommands,
     },
 
-    /// Generate Seed string from provided code and secret key encoded in base64.
-    /// Code specify algorithm to use. Possible values are:
-    ///     `A` for Ed25519 private key,
-    ///     `J` for ECDSA secp256k1 private key,
-    ///     'K' for Ed448 private key.
-    /// If no arguments it generates Ed25519 secret key.
-    #[clap(verbatim_doc_comment)]
-    Seed {
-        #[arg(short, long, requires = "secret_key")]
-        code: Option<String>,
-        #[arg(short, long, requires = "code")]
-        secret_key: Option<String>,
-    },
     /// Shows information about working environment
     Info,
 }
@@ -181,6 +172,9 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
         Some(Commands::Data { command }) => {
             process_data_command(command).await?;
         }
+        Some(Commands::Key { command }) => {
+            process_key_command(command).await?;
+        }
 
         Some(Commands::Mesagkesto { command }) => match command {
             MesagkestoCommands::Exchange {
@@ -199,31 +193,6 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
             }
         },
         Some(Commands::Said { command }) => process_said_command(command).await?,
-        Some(Commands::Seed { code, secret_key }) => {
-            // seed is in b64
-            let seed = match (code, secret_key) {
-                (None, None) => Ok(generate_seed()),
-                (None, Some(_sk)) => Ok("Code needs to be provided".to_string()),
-                (Some(_code), None) => Ok("Key needs to be provided".to_string()),
-                (Some(code), Some(sk_str)) => {
-                    let code = code
-                        .parse::<SeedCode>()
-                        .map_err(|_e| CliError::SeedError(code.to_string()));
-                    let sk = BASE64_STANDARD
-                        .decode(&sk_str)
-                        .map_err(|_| CliError::B64Error(sk_str.to_string()));
-                    match (code, sk) {
-                        (Ok(code), Ok(sk)) => convert_to_seed(code, sk)
-                            .map_err(|e| CliError::SecretKeyError(sk_str, e)),
-                        (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => Err(e),
-                    }
-                }
-            };
-            match seed {
-                Ok(seed) => println!("{}", seed),
-                Err(e) => println!("{}", e),
-            }
-        }
         Some(Commands::Info) => {
             let working_directory = working_directory()?;
             println!("Working directory: {}", working_directory.to_str().unwrap());
