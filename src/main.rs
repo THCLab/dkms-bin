@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use base64::{prelude::BASE64_STANDARD, Engine};
 use cesrox::primitives::codes::seed::SeedCode;
 use clap::{CommandFactory, Parser, Subcommand};
@@ -13,12 +11,11 @@ use subcommands::{
     data::{process_data_command, DataCommand},
     identifier::{process_identifier_command, IdentifierCommand},
     log::{process_log_command, LogCommand},
+    said::{process_said_command, SaidCommands},
 };
 use thiserror::Error;
 use utils::{working_directory, ExtractionError, LoadingError};
 use verification_status::VerificationStatus;
-
-use crate::said::handle_sad;
 
 mod expand;
 mod init;
@@ -120,15 +117,6 @@ pub enum OobiRoles {
     Messagebox,
 }
 
-#[derive(Subcommand)]
-pub enum SaidCommands {
-    // Computes the SAID of the provided JSON file and replaces the d field with it
-    SAD {
-        #[arg(short, long)]
-        file: PathBuf,
-    },
-}
-
 #[derive(Error, Debug)]
 pub enum CliError {
     #[error(transparent)]
@@ -210,12 +198,7 @@ async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
                 println!("{}", qry);
             }
         },
-        Some(Commands::Said { command }) => match command {
-            SaidCommands::SAD { file } => {
-                let sad = handle_sad(file).await?;
-                println!("{}", sad);
-            }
-        },
+        Some(Commands::Said { command }) => process_said_command(command).await?,
         Some(Commands::Seed { code, secret_key }) => {
             // seed is in b64
             let seed = match (code, secret_key) {
