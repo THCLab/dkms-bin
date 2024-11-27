@@ -80,10 +80,7 @@ pub async fn handle_kel_query(
                                 // check if identifier oobi is known
                                 let oobis = id
                                     .clone()
-                                    .get_end_role(
-                                        identifier_prefix,
-                                        keri_core::oobi::Role::Witness,
-                                    )
+                                    .get_end_role(identifier_prefix, keri_core::oobi::Role::Witness)
                                     .unwrap();
                                 if oobis.is_empty() {
                                     VerifyHandleError::MissingOobi(identifier_prefix.clone())

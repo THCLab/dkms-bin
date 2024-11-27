@@ -10,13 +10,12 @@ use crate::{
 #[derive(Subcommand)]
 pub enum KeyCommands {
     /// Generate Seed string from provided code and secret key encoded in base64.
-    /// Code specify algorithm to use. Possible values are:
-    ///     `A` for Ed25519 private key,
-    ///     `J` for ECDSA secp256k1 private key,
-    ///     'K' for Ed448 private key.
     /// If no arguments it generates Ed25519 secret key.
-    #[clap(verbatim_doc_comment)]
     Seed {
+        /// Code specify algorithm to use. Possible values are:
+        ///     `A` for Ed25519 private key,
+        ///     `J` for ECDSA secp256k1 private key,
+        ///     'K' for Ed448 private key.
         #[arg(short, long, requires = "secret_key")]
         code: Option<String>,
         #[arg(short, long, requires = "code")]

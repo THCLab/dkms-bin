@@ -1,4 +1,4 @@
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use error::CliError;
 use subcommands::{
     data::{process_data_command, DataCommand},
@@ -12,6 +12,7 @@ use utils::working_directory;
 
 mod error;
 mod expand;
+mod help;
 mod init;
 mod kel;
 mod keri;
@@ -28,7 +29,7 @@ mod verification_status;
 mod verify;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None,)]
+#[command(author, version, about, long_about = None, help_template = help::HELP_TEMPLATE)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -74,11 +75,28 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), CliError> {
-    let cli = Cli::parse();
-    if let Err(e) = process_command(cli.command).await {
-        println!("{}", e);
-        std::process::exit(1);
-    };
+    let help_text = help::generate_help_text();
+
+    let command = Cli::command()
+        .help_template(&help::HELP_TEMPLATE.replace("{commands}", &help_text))
+        .get_matches();
+
+    let cli: Cli = FromArgMatches::from_arg_matches(&command).unwrap();
+    match cli.command {
+        Some(command) => {
+            if let Err(e) = process_command(Some(command)).await {
+                println!("{}", e);
+                std::process::exit(1);
+            };
+        }
+        None => {
+            // If no subcommand is provided, display the help message
+            Cli::command()
+                .help_template(&help::HELP_TEMPLATE.replace("{commands}", &help_text))
+                .print_help()
+                .unwrap();
+        }
+    }
 
     Ok(())
 }
