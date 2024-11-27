@@ -64,9 +64,9 @@ pub async fn handle_kel_query(
     let id = Arc::new(load(alias)?);
     let signer = Arc::new(load_signer(alias)?);
 
-    let out = handle_get_identifier_kel(id.clone(), signer, &about_who, oobi).await;
+    let out = handle_get_identifier_kel(id.clone(), signer, about_who, oobi).await;
     Ok(match out {
-        Ok(Some(kel)) => format!("{}", kel),
+        Ok(Some(kel)) => kel.to_string(),
         Ok(None) => {
             format!("Unknown identifier {}", about_who)
         }
@@ -81,7 +81,7 @@ pub async fn handle_kel_query(
                                 let oobis = id
                                     .clone()
                                     .get_end_role(
-                                        &identifier_prefix,
+                                        identifier_prefix,
                                         keri_core::oobi::Role::Witness,
                                     )
                                     .unwrap();
@@ -89,7 +89,7 @@ pub async fn handle_kel_query(
                                     VerifyHandleError::MissingOobi(identifier_prefix.clone())
                                         .to_string()
                                 } else {
-                                    format!("{}", e.to_string())
+                                    e.to_string()
                                 }
                             }
                             _ => e.to_string(),
@@ -97,7 +97,7 @@ pub async fn handle_kel_query(
                     })
                     .collect::<Vec<_>>()
                     .join(". ");
-                format!("{}", err)
+                err.to_string()
             }
             _ => format!("{}", err),
         },

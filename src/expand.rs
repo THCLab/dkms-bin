@@ -70,7 +70,7 @@ fn readable_signature_group_element(quadruple: TransferableQuadruple) -> String 
         output.push_str("    Signatures:\n  ")
     }
     for signature in signatures {
-        output.push_str(&format!("{}", readable_indexed_signature(&signature)));
+        output.push_str(&readable_indexed_signature(&signature).to_string());
     }
     output
 }

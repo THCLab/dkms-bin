@@ -1,13 +1,9 @@
-use std::{fs, path::PathBuf};
-
 use indexmap::IndexMap;
 use said::{
     derivation::{HashFunction, HashFunctionCode},
     sad::DerivationCode,
 };
 use thiserror::Error;
-
-use crate::CliError;
 
 #[derive(Error, Debug)]
 pub enum SaidError {
