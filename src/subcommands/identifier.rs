@@ -23,7 +23,7 @@ pub enum IdentifierCommand {
         alias: Option<String>,
         /// File with seed of the keys: current and next
         #[arg(long)]
-        init_seed_file: Option<PathBuf>,
+        from_seed_file: Option<PathBuf>,
         /// OOBI of the witness (json format)
         #[arg(long)]
         witness: Vec<String>,
@@ -35,7 +35,7 @@ pub enum IdentifierCommand {
         witness_threshold: Option<u64>,
         /// Generates json file with current and next keys seeds in provided path
         #[arg(long)]
-        seed_file: Option<PathBuf>,
+        init_seed_file: Option<PathBuf>,
     },
     /// Shows information about identifier of given alias
     Whoami { alias: String },
@@ -70,11 +70,11 @@ pub async fn process_identifier_command(command: IdentifierCommand) -> Result<()
     match command {
         IdentifierCommand::Init {
             alias,
-            init_seed_file,
+            from_seed_file: init_seed_file,
             witness,
             watcher,
             witness_threshold,
-            seed_file,
+            init_seed_file: seed_file,
         } => {
             match (&init_seed_file, &seed_file) {
                 (None, Some(path)) => {

@@ -33,7 +33,7 @@ pub enum DataCommand {
         #[arg(short, long)]
         alias: String,
         #[arg(short, long)]
-        credential_json: String,
+        acdc_credential_json: String,
     },
 }
 
@@ -68,7 +68,7 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
         DataCommand::Expand { cesr } => expand::expand(&cesr),
         DataCommand::Issue {
             alias,
-            credential_json,
+            acdc_credential_json: credential_json,
         } => handle_issue(&alias, &credential_json).await?,
     }
     Ok(())
