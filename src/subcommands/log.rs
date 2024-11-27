@@ -5,7 +5,7 @@ use keri_controller::IdentifierPrefix;
 
 use crate::{
     kel::{handle_kel_query, handle_rotate},
-    tel::{self, handle_issue, handle_query, handle_tel_oobi},
+    tel::{self, handle_query, handle_tel_oobi},
     CliError,
 };
 
@@ -53,13 +53,7 @@ pub enum TelCommands {
         #[arg(short, long)]
         alias: String,
     },
-    /// Issue credential
-    Issue {
-        #[arg(short, long)]
-        alias: String,
-        #[arg(short, long)]
-        credential_json: String,
-    },
+
     /// Search Transaction Event Log event
     Query {
         #[arg(short, long)]
@@ -103,12 +97,6 @@ pub async fn process_log_command(command: LogCommand) -> Result<(), CliError> {
             match command {
                 TelCommands::Incept { alias } => {
                     tel::handle_tel_incept(&alias).await?;
-                }
-                TelCommands::Issue {
-                    alias,
-                    credential_json,
-                } => {
-                    handle_issue(&alias, &credential_json).await?;
                 }
                 TelCommands::Query {
                     alias,

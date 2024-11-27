@@ -1,8 +1,8 @@
 use clap::Subcommand;
 
 use crate::{
-    expand, sign::handle_sign, verification_status::VerificationStatus, verify::handle_verify,
-    CliError,
+    expand, sign::handle_sign, tel::handle_issue, verification_status::VerificationStatus,
+    verify::handle_verify, CliError,
 };
 
 #[derive(Subcommand)]
@@ -27,6 +27,13 @@ pub enum DataCommand {
     Expand {
         /// A CESR string, such as one produced by the issue or sign command
         cesr: String,
+    },
+    /// Issue credential
+    Issue {
+        #[arg(short, long)]
+        alias: String,
+        #[arg(short, long)]
+        credential_json: String,
     },
 }
 
@@ -59,6 +66,10 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             }
         }
         DataCommand::Expand { cesr } => expand::expand(&cesr),
+        DataCommand::Issue {
+            alias,
+            credential_json,
+        } => handle_issue(&alias, &credential_json).await?,
     }
     Ok(())
 }
