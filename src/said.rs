@@ -11,12 +11,15 @@ pub enum SaidError {
     MissingSaidField,
     #[error("Invalid SAID. {0}")]
     InvalidSaid(said::error::Error),
-    #[error("Invalid JSON: {0}")]
+    #[error("Invalid JSON: {0}. Make sure to add single quotes around the provided text.")]
+    InvalidJson(String),
+    #[error("Serde json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
 }
 
 pub fn handle_sad(input: &str) -> Result<String, SaidError> {
-    let mut map: IndexMap<String, serde_json::Value> = serde_json::from_str(input)?;
+    let mut map: IndexMap<String, serde_json::Value> =
+        serde_json::from_str(input).map_err(|_| SaidError::InvalidJson(input.to_string()))?;
     if let Some(_dig) = map.get("d") {
         let code = HashFunctionCode::Blake3_256;
         map["d"] = serde_json::Value::String("#".repeat(code.full_size()));

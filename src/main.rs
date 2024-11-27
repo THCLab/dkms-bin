@@ -84,7 +84,7 @@ async fn main() -> Result<(), CliError> {
     let cli: Cli = FromArgMatches::from_arg_matches(&command).unwrap();
     match cli.command {
         Some(command) => {
-            if let Err(e) = process_command(Some(command)).await {
+            if let Err(e) = process_command(command).await {
                 println!("{}", e);
                 std::process::exit(1);
             };
@@ -101,30 +101,26 @@ async fn main() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn process_command(command: Option<Commands>) -> Result<(), CliError> {
+async fn process_command(command: Commands) -> Result<(), CliError> {
     match command {
-        Some(Commands::Identifier { command }) => {
+        Commands::Identifier { command } => {
             process_identifier_command(command).await?;
         }
-        Some(Commands::Log { command }) => {
+        Commands::Log { command } => {
             process_log_command(command).await?;
         }
-        Some(Commands::Data { command }) => {
+        Commands::Data { command } => {
             process_data_command(command).await?;
         }
-        Some(Commands::Key { command }) => {
+        Commands::Key { command } => {
             process_key_command(command).await?;
         }
 
-        Some(Commands::Mesagkesto { command }) => process_mesagkesto_command(command).await?,
-        Some(Commands::Said { command }) => process_said_command(command).await?,
-        Some(Commands::Info) => {
+        Commands::Mesagkesto { command } => process_mesagkesto_command(command).await?,
+        Commands::Said { command } => process_said_command(command).await?,
+        Commands::Info => {
             let working_directory = working_directory()?;
             println!("Working directory: {}", working_directory.to_str().unwrap());
-        }
-        None => {
-            // If no subcommand is provided, display the help message
-            Cli::command().print_help().unwrap();
         }
     };
     Ok(())
