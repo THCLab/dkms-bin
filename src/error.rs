@@ -22,7 +22,7 @@ pub enum CliError {
     MissingDigest,
     #[error(transparent)]
     MesagkestoError(#[from] MesagkestoError),
-    #[error("Wrong 'd' field value. {0}")]
+    #[error("{0}")]
     SaidError(#[from] SaidError),
     #[error("Unknown identifier: {0}")]
     UnknownIdentifier(String),

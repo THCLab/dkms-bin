@@ -19,14 +19,7 @@ pub enum SaidError {
     SerdeJson(#[from] serde_json::Error),
 }
 
-pub async fn handle_sad(path: PathBuf) -> Result<String, CliError> {
-    let file = fs::read_to_string(path).expect("Should have been able to read the file");
-    let inserted = insert_said(&file)?;
-
-    Ok(inserted)
-}
-
-fn insert_said(input: &str) -> Result<String, SaidError> {
+pub fn handle_sad(input: &str) -> Result<String, SaidError> {
     let mut map: IndexMap<String, serde_json::Value> = serde_json::from_str(input)?;
     if let Some(_dig) = map.get("d") {
         let code = HashFunctionCode::Blake3_256;
@@ -42,7 +35,7 @@ fn insert_said(input: &str) -> Result<String, SaidError> {
 #[test]
 fn test_json_to_sad() {
     let data = r#"{"hello":"world","d":""}"#;
-    let said_inserted = insert_said(data);
+    let said_inserted = handle_sad(data);
 
     let to_compute = format!(r#"{{"hello":"world","d":"{}"}}"#, "#".repeat(44));
     let expected_said =
