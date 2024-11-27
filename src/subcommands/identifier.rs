@@ -1,10 +1,14 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::PathBuf,
+};
 
 use clap::Subcommand;
 use tabled::{builder::Builder, settings::Style};
 
 use crate::{
-    init::handle_init,
+    init::{handle_init, KeysConfig},
     resolve::{self, handle_resolve, OobiRoles},
     utils::{handle_info, working_directory, LoadingError},
     CliError,
@@ -16,10 +20,10 @@ pub enum IdentifierCommand {
     Init {
         /// Alias of the identifier used by the tool for internal purposes
         #[arg(short, long)]
-        alias: String,
+        alias: Option<String>,
         /// File with seed of the keys: current and next
-        #[arg(short, long)]
-        keys_file: Option<PathBuf>,
+        #[arg(long)]
+        init_seed_file: Option<PathBuf>,
         /// OOBI of the witness (json format)
         #[arg(long)]
         witness: Vec<String>,
@@ -29,6 +33,9 @@ pub enum IdentifierCommand {
         /// Natural number specifying the minimum witnesses needed to confirm a KEL event
         #[arg(long)]
         witness_threshold: Option<u64>,
+        /// Generates json file with current and next keys seeds in provided path
+        #[arg(long)]
+        seed_file: Option<PathBuf>,
     },
     /// Shows information about identifier of given alias
     Whoami { alias: String },
@@ -63,11 +70,37 @@ pub async fn process_identifier_command(command: IdentifierCommand) -> Result<()
     match command {
         IdentifierCommand::Init {
             alias,
-            keys_file,
+            init_seed_file,
             witness,
             watcher,
             witness_threshold,
+            seed_file,
         } => {
+            match (&init_seed_file, &seed_file) {
+                (None, Some(path)) => {
+                    let kc = KeysConfig::default();
+                    let mut file = File::create(&path)?;
+                    file.write_all(&serde_json::to_vec(&kc).unwrap())?;
+                    println!("Seed generated and saved in {}", &path.to_str().unwrap());
+                    return Ok(());
+                }
+                (_, None) => (),
+                (Some(_), Some(_)) => {
+                    return Err(CliError::ArgumentsError(
+                        "You can specify only one of 'init_seed_file' or 'seed_file', but not both"
+                            .to_string(),
+                    ))
+                }
+            };
+
+            let alias = if let Some(alias) = alias {
+                alias
+            } else {
+                return Err(CliError::ArgumentsError(
+                    "The 'alias' argument needs to be provided".to_string(),
+                ));
+            };
+
             let witness_threshold = witness_threshold.unwrap_or(1);
             let witnesses_oobi = if witness.is_empty() {
                 None
@@ -81,7 +114,7 @@ pub async fn process_identifier_command(command: IdentifierCommand) -> Result<()
             };
             handle_init(
                 alias,
-                keys_file,
+                init_seed_file,
                 witnesses_oobi,
                 watchers_oobi,
                 witness_threshold,

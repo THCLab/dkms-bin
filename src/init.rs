@@ -42,6 +42,7 @@ impl Display for ConfigError {
             ConfigFileError::Toml(error) => write!(f, "Configuration file error: {}", error),
             ConfigFileError::Yaml(error) => write!(f, "Configuration file error: {}", error),
             ConfigFileError::UnsupportedFormat => write!(f, "Unsupported configuration file error"),
+            ConfigFileError::Json(error) => write!(f, "Configuration file error: {}", error),
         }
     }
 }

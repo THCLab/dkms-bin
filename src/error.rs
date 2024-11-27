@@ -44,4 +44,6 @@ pub enum CliError {
     JsonExpected,
     #[error("{0:?}")]
     KelGetting(Vec<WatcherResponseError>),
+    #[error("{0}")]
+    ArgumentsError(String),
 }
