@@ -9,7 +9,7 @@ edition = "2021"
 keri-core = { version = "0.13.0", features = ["oobi", "mailbox"]}
 keri-controller = { version = "0.13.0" }
 said = { version = "0.4.0", features = ["macros"]} 
-cesrox = { version = "0.1.5", features = ["cesr-proof"] }
+cesrox = { version = "0.1.6", features = ["cesr-proof"] }
 anyhow = { version = "1.0" }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }

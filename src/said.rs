@@ -11,7 +11,7 @@ pub enum SaidError {
     MissingSaidField,
     #[error("Invalid SAID. {0}")]
     InvalidSaid(said::error::Error),
-    #[error("Serde_json error: {0}")]
+    #[error("Invalid JSON: {0}")]
     SerdeJson(#[from] serde_json::Error),
 }
 
