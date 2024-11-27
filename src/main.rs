@@ -48,12 +48,16 @@ struct Cli {
 enum Commands {
     /// Init new signer
     Init {
+        /// Alias of the identifier used by the tool for internal purposes
         #[arg(short, long)]
         alias: String,
+        /// File with seed of the keys: current and next
         #[arg(short, long)]
         keys_file: Option<PathBuf>,
+        /// OOBI of the witness (json format)
         #[arg(long)]
         witness: Vec<String>,
+        /// OOBI of the watcher (json format)
         #[arg(long)]
         watcher: Vec<String>,
         #[arg(long)]
