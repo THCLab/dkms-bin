@@ -2,7 +2,7 @@ use std::{
     error::Error,
     fmt::Display,
     fs::{self, File},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -125,8 +125,18 @@ pub async fn handle_init(
         watcher: watchers_oobi,
     };
 
-    let keys = match keys_file {
-        Some(file_path) => KeysConfig::from_config_file(file_path)?,
+    let keys = match &keys_file {
+        Some(file_path) => {
+            let contents = fs::read_to_string(file_path).map_err(|_e| {
+                CliError::ArgumentsError(format!(
+                    "File {} doesn't exist",
+                    file_path.to_str().unwrap()
+                ))
+            })?;
+            serde_json::from_str(&contents).map_err(|_e| {
+                CliError::ArgumentsError("Wrong format of file with seeds".to_string())
+            })?
+        }
         None => {
             // println!("Generating keypairs for {}", &alias);
             KeysConfig::default()
@@ -140,7 +150,7 @@ pub async fn handle_init(
     let mut db_path = store_path.clone();
     db_path.push("db");
 
-    let info = format!("No witnesses are configured for {} identifier, so KEL won't be publicly available. To configure witnesses, provide config file with -c option", &alias);
+    let info = format!("No witnesses are configured for {} identifier, so KEL won't be publicly available. To configure witnesses, provide their OOBIs with --witness option", &alias);
     match &kel_config.witness {
         Some(wits) if wits.is_empty() => println!("{}", info),
         None => println!("{}", info),
