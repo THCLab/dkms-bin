@@ -16,7 +16,7 @@ use crate::{
 
 #[derive(Subcommand)]
 pub enum IdentifierCommand {
-    /// Init new signer
+    /// Initialize a new identifier with an associated alias
     Init {
         /// Alias of the identifier used by the tool for internal purposes
         #[arg(short, long)]
@@ -37,11 +37,11 @@ pub enum IdentifierCommand {
         #[arg(long)]
         init_seed_file: Option<PathBuf>,
     },
-    /// Shows information about identifier of given alias
-    Whoami { alias: String },
-    /// Lists all created aliases along with their identifiers
+    /// Show the identifier details of a specified alias
+    Info { alias: String },
+    /// List all aliases and their corresponding identifiers
     List,
-    /// Manage saved OOBIs
+    /// List identifier OOBIs
     Oobi {
         #[command(subcommand)]
         command: OobiCommands,
@@ -121,7 +121,7 @@ pub async fn process_identifier_command(command: IdentifierCommand) -> Result<()
             )
             .await
         }
-        IdentifierCommand::Whoami { alias } => Ok(handle_info(&alias)?),
+        IdentifierCommand::Info { alias } => Ok(handle_info(&alias)?),
         IdentifierCommand::List => {
             let working_directory = working_directory()?;
             let mut builder = Builder::new();
