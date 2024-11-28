@@ -212,17 +212,7 @@ pub async fn process_identifier_command(
         }
         IdentifierCommand::Export { alias } => {
             let exported = handle_export(&alias)?;
-            match File::create(format!("{}.json", &alias)) {
-                Ok(mut file) => {
-                    if let Err(e) =
-                        file.write_all(serde_json::to_string_pretty(&exported).unwrap().as_bytes())
-                    {
-                        println!("Failed to write to file: {}", e);
-                    }
-                }
-                Err(e) => println!("Failed to create file: {}", e),
-            }
-
+            println!("{}", serde_json::to_string_pretty(&exported).unwrap());
             Ok(())
         }
     }
