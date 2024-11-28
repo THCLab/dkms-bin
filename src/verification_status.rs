@@ -33,8 +33,13 @@ impl From<ACDCState> for VerificationStatus {
 
 impl From<VerifyHandleError> for VerificationStatus {
     fn from(value: VerifyHandleError) -> Self {
-        VerificationStatus::Error {
-            description: value.to_string(),
+        match value {
+            VerifyHandleError::FaultySignatures => VerificationStatus::Invalid {
+                description: value.to_string(),
+            },
+            _ => VerificationStatus::Error {
+                description: value.to_string(),
+            },
         }
     }
 }

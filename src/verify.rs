@@ -31,11 +31,16 @@ pub enum VerifyHandleError {
     SendingError(#[from] SendingError),
     #[error("{0}")]
     List(ErrorList),
+    #[error("Signature doesn't match provided data")]
+    FaultySignatures,
 }
 
 impl From<VerificationError> for VerifyHandleError {
     fn from(value: VerificationError) -> Self {
-        VerifyHandleError::VerError(VerificationErrorWrapper(value))
+        match value {
+            VerificationError::VerificationFailure => VerifyHandleError::FaultySignatures,
+            e => VerifyHandleError::VerError(VerificationErrorWrapper(e)),
+        }
     }
 }
 
@@ -115,6 +120,11 @@ pub async fn handle_verify(
         match who_id.verify_from_cesr(&message) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
             Err(ControllerError::VerificationError(e)) => {
+                if e.iter()
+                    .any(|(_e, _)| matches!(VerificationError::VerificationFailure, _e))
+                {
+                    return Err(VerifyHandleError::FaultySignatures);
+                };
                 let err_list = ErrorList(
                     e.into_iter()
                         .map(|(e, _)| {
@@ -138,7 +148,6 @@ pub async fn handle_verify(
                                 }
                                 _ => e.into(),
                             }
-                            //    e.into()
                         })
                         .collect(),
                 );
