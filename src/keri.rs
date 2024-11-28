@@ -123,16 +123,20 @@ pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result
 
     id.notify_witnesses().await?;
 
-    if let Some(witness_id) = id.find_state(id.id())?.witness_config.witnesses.first() {
-        let _queries = query_mailbox(id, signer.clone(), witness_id).await?;
-        id.notify_backers().await?;
-    } else {
+    let witnesses = id.find_state(id.id())?.witness_config.witnesses;
+    if witnesses.is_empty() {
         let info = format!(
             "No witnesses are configured for {} identifier, so TEL won't be publicly available.",
             &id.id()
         );
         println!("{}", info);
+    } else {
+        for witness_id in witnesses {
+            let _queries = query_mailbox(id, signer.clone(), &witness_id).await?;
+        }
     };
+    id.notify_backers().await?;
+
     println!("Registry {} incepted for identifier: {}", reg_id, id.id());
 
     // id.registry_id = Some(reg_id);
