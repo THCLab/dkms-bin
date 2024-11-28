@@ -48,12 +48,6 @@ pub enum KelCommands {
 
 #[derive(Subcommand)]
 pub enum TelCommands {
-    /// Init Transaction Event Log for given alias
-    Incept {
-        #[arg(short, long)]
-        alias: String,
-    },
-
     /// Search Transaction Event Log event
     Query {
         #[arg(short, long)]
@@ -95,9 +89,6 @@ pub async fn process_log_command(command: LogCommand) -> Result<(), CliError> {
         }
         LogCommand::Tel { command } => {
             match command {
-                TelCommands::Incept { alias } => {
-                    tel::handle_tel_incept(&alias).await?;
-                }
                 TelCommands::Query {
                     alias,
                     issuer_id,

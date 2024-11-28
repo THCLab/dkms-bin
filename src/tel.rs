@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, sync::Arc};
 
-use keri_controller::{EndRole, IdentifierPrefix, Oobi};
+use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi};
 use keri_core::actor::prelude::SelfAddressingIdentifier;
 use serde_json::Value;
 
@@ -11,19 +11,24 @@ use crate::{
     CliError,
 };
 
-pub async fn handle_tel_incept(alias: &str) -> Result<(), CliError> {
-    let mut id = load(alias)?;
-    let signer = Arc::new(load_signer(alias)?);
-    crate::keri::incept_registry(&mut id, signer).await?;
-
-    // Save registry identifier
+pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), CliError> {
     let mut store_path = working_directory()?;
     store_path.push(alias);
 
     let mut reg_path = store_path.clone();
     reg_path.push("reg_id");
     let mut file = File::create(reg_path)?;
-    file.write_all(id.registry_id().as_ref().unwrap().to_string().as_bytes())?;
+    file.write_all(registry_id.as_bytes())?;
+    Ok(())
+}
+
+pub async fn handle_tel_incept(alias: &str) -> Result<(), CliError> {
+    let mut id = load(alias)?;
+    let signer = Arc::new(load_signer(alias)?);
+    crate::keri::incept_registry(&mut id, signer).await?;
+    let registry_id = id.registry_id().as_ref().unwrap().to_string();
+    // Save registry identifier
+    save_registry(alias, &registry_id)?;
 
     Ok(())
 }
@@ -39,6 +44,12 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
         let said: SelfAddressingIdentifier = digest.parse().map_err(SaidError::InvalidSaid)?;
 
         let signer = Arc::new(load_signer(alias)?);
+        if let None = id.registry_id() {
+            // incept TEL if not incepted
+            crate::keri::incept_registry(&mut id, signer.clone()).await?;
+            let registry_id = id.registry_id().as_ref().unwrap().to_string();
+            save_registry(alias, &registry_id)?;
+        };
         issue(&mut id, said, signer).await?;
     } else {
         println!("Wrong json format: {}", data);

@@ -137,7 +137,7 @@ pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result
     };
     id.notify_backers().await?;
 
-    println!("Registry {} incepted for identifier: {}", reg_id, id.id());
+    // println!("Registry {} incepted for identifier: {}", reg_id, id.id());
 
     // id.registry_id = Some(reg_id);
 
