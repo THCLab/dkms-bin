@@ -17,6 +17,8 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyHandleError {
+    #[error("Unknown identifier alias: {0}")]
+    UnknownIdentifier(String),
     #[error("Unknown oobi of identifier {0}. You can provide its oobi with --oobi option")]
     MissingOobi(IdentifierPrefix),
     #[error("Wrong signature format: {0}")]
@@ -90,7 +92,8 @@ pub async fn handle_verify(
     oobi: &[&str],
     message: String,
 ) -> Result<ACDCState, VerifyHandleError> {
-    let who_id = load(alias).unwrap();
+    let who_id =
+        load(alias).map_err(|_| VerifyHandleError::UnknownIdentifier(alias.to_string()))?;
 
     // parse and resolve oobis
     let oobis = parse_json_arguments::<Oobi>(oobi)
