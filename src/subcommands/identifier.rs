@@ -5,13 +5,15 @@ use std::{
 };
 
 use clap::Subcommand;
+use keri_controller::LocationScheme;
 use tabled::{builder::Builder, settings::Style};
+use url::Url;
 
 use crate::{
     init::{handle_init, KeysConfig},
+    keri::KeriError,
     resolve::{self, handle_resolve, OobiRoles},
     utils::{handle_info, working_directory, LoadingError},
-    CliError,
 };
 
 #[derive(Subcommand)]
@@ -24,12 +26,12 @@ pub enum IdentifierCommand {
         /// File with seed of the keys: current and next
         #[arg(long)]
         from_seed_file: Option<PathBuf>,
-        /// OOBI of the witness (json format)
+        /// Url of the witness
         #[arg(long)]
-        witness: Vec<String>,
-        /// OOBI of the watcher (json format)
+        witness_url: Vec<Url>,
+        /// Url of the watcher
         #[arg(long)]
-        watcher: Vec<String>,
+        watcher_url: Vec<Url>,
         /// Natural number specifying the minimum witnesses needed to confirm a KEL event
         #[arg(long)]
         witness_threshold: Option<u64>,
@@ -66,13 +68,52 @@ pub enum OobiCommands {
     },
 }
 
-pub async fn process_identifier_command(command: IdentifierCommand) -> Result<(), CliError> {
+#[derive(thiserror::Error, Debug)]
+pub enum IdentifierSubcommandError {
+    #[error("{0}")]
+    InitError(#[from] InitError),
+    #[error("{0}")]
+    ArgumentsError(String),
+    #[error(transparent)]
+    FileError(#[from] std::io::Error),
+    #[error(transparent)]
+    LoadingError(#[from] LoadingError),
+    #[error(transparent)]
+    KeriError(#[from] KeriError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum InitError {
+    #[error("Make sure that provided urls are correct. \nDetails: \n{0}")]
+    UrlError(#[from] url::ParseError),
+    #[error("Can't connect with provided address. Make sure that provided urls are correct. Details:\n{0}")]
+    ReqwestError(#[from] reqwest::Error),
+}
+
+async fn find_oobi(url: url::Url) -> Result<LocationScheme, InitError> {
+    let introduce_url = url.clone().join("introduce")?;
+    Ok(reqwest::get(introduce_url)
+        .await?
+        .json::<LocationScheme>()
+        .await?)
+}
+
+async fn find_oobis_for_urls<I>(urls: I) -> Result<Vec<LocationScheme>, InitError>
+where
+    I: IntoIterator<Item = Url>,
+{
+    futures::future::try_join_all(urls.into_iter().map(|url| find_oobi(url))).await
+}
+
+pub async fn process_identifier_command(
+    command: IdentifierCommand,
+) -> Result<(), IdentifierSubcommandError> {
     match command {
         IdentifierCommand::Init {
             alias,
             from_seed_file: init_seed_file,
-            witness,
-            watcher,
+            witness_url: witness,
+            watcher_url: watcher,
             witness_threshold,
             init_seed_file: seed_file,
         } => {
@@ -86,7 +127,7 @@ pub async fn process_identifier_command(command: IdentifierCommand) -> Result<()
                 }
                 (_, None) => (),
                 (Some(_), Some(_)) => {
-                    return Err(CliError::ArgumentsError(
+                    return Err(IdentifierSubcommandError::ArgumentsError(
                         "You can specify only one of 'init_seed_file' or 'seed_file', but not both"
                             .to_string(),
                     ))
@@ -96,27 +137,21 @@ pub async fn process_identifier_command(command: IdentifierCommand) -> Result<()
             let alias = if let Some(alias) = alias {
                 alias
             } else {
-                return Err(CliError::ArgumentsError(
+                return Err(IdentifierSubcommandError::ArgumentsError(
                     "The 'alias' argument needs to be provided".to_string(),
                 ));
             };
 
             let witness_threshold = witness_threshold.unwrap_or(1);
-            let witnesses_oobi = if witness.is_empty() {
-                None
-            } else {
-                Some(witness)
-            };
-            let watchers_oobi = if watcher.is_empty() {
-                None
-            } else {
-                Some(watcher)
-            };
+
+            let witnesses_oobis = find_oobis_for_urls(witness).await?;
+
+            let watchers_oobis = find_oobis_for_urls(watcher).await?;
             handle_init(
                 alias,
                 init_seed_file,
-                witnesses_oobi,
-                watchers_oobi,
+                witnesses_oobis,
+                watchers_oobis,
                 witness_threshold,
             )
             .await

@@ -6,6 +6,7 @@ use crate::{
     keri::KeriError,
     mesagkesto::MesagkestoError,
     said::SaidError,
+    subcommands::identifier::IdentifierSubcommandError,
     utils::{ExtractionError, LoadingError},
     verification_status::VerificationStatus,
 };
@@ -45,5 +46,5 @@ pub enum CliError {
     #[error("{0:?}")]
     KelGetting(Vec<WatcherResponseError>),
     #[error("{0}")]
-    ArgumentsError(String),
+    IdentifierCommand(#[from] IdentifierSubcommandError),
 }

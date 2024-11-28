@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     keri::{setup_identifier, KeriError},
+    subcommands::identifier::IdentifierSubcommandError,
     utils::{parse_json_arguments, working_directory},
     CliError,
 };
@@ -101,40 +102,38 @@ fn _ask_for_confirmation(prompt: &str) -> bool {
 pub async fn handle_init(
     alias: String,
     keys_file: Option<PathBuf>,
-    witnesses: Option<Vec<String>>,
-    watchers: Option<Vec<String>>,
+    witnesses: Vec<LocationScheme>,
+    watchers: Vec<LocationScheme>,
     witness_threshold: u64,
-) -> Result<(), CliError> {
-    let witnesses_oobi = witnesses
-        .map(|list| {
-            parse_json_arguments::<LocationScheme>(
-                &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
-            )
-        })
-        .transpose()?;
-    let watchers_oobi = watchers
-        .map(|list| {
-            parse_json_arguments::<LocationScheme>(
-                &list.iter().map(|el| el.as_str()).collect::<Vec<_>>(),
-            )
-        })
-        .transpose()?;
+) -> Result<(), IdentifierSubcommandError> {
+    let witness_config = if witnesses.is_empty() {
+        None
+    } else {
+        Some(witnesses)
+    };
+    let watcher_config = if watchers.is_empty() {
+        None
+    } else {
+        Some(watchers)
+    };
     let kel_config = KelConfig {
-        witness: witnesses_oobi,
+        witness: witness_config,
         witness_threshold,
-        watcher: watchers_oobi,
+        watcher: watcher_config,
     };
 
     let keys = match &keys_file {
         Some(file_path) => {
             let contents = fs::read_to_string(file_path).map_err(|_e| {
-                CliError::ArgumentsError(format!(
+                IdentifierSubcommandError::ArgumentsError(format!(
                     "File {} doesn't exist",
                     file_path.to_str().unwrap()
                 ))
             })?;
             serde_json::from_str(&contents).map_err(|_e| {
-                CliError::ArgumentsError("Wrong format of file with seeds".to_string())
+                IdentifierSubcommandError::ArgumentsError(
+                    "Wrong format of file with seeds".to_string(),
+                )
             })?
         }
         None => {

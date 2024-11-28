@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use clap::Subcommand;
 use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi};
 
-use crate::{keri::KeriError, utils::load, CliError};
+use crate::{
+    keri::KeriError, subcommands::identifier::IdentifierSubcommandError, utils::load, CliError,
+};
 
 #[derive(Subcommand)]
 pub enum OobiRoles {
@@ -13,7 +15,7 @@ pub enum OobiRoles {
     Messagebox,
 }
 
-pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), CliError> {
+pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), IdentifierSubcommandError> {
     let id_cont = load(alias)?;
     let file = fs::read_to_string(path).expect("Should have been able to read the file");
     for oobi in serde_json::from_str::<Vec<Oobi>>(&file).unwrap() {
