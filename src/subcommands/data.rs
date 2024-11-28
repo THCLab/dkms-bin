@@ -32,7 +32,7 @@ pub enum DataCommand {
     Issue {
         #[arg(short, long)]
         alias: String,
-        #[arg(short, long)]
+        #[arg(short = 'c', long)]
         acdc_credential_json: String,
     },
 }
