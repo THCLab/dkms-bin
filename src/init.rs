@@ -101,7 +101,7 @@ fn _ask_for_confirmation(prompt: &str) -> bool {
 
 pub async fn handle_init(
     alias: String,
-    keys_file: Option<PathBuf>,
+    keys_config: Option<KeysConfig>,
     witnesses: Vec<LocationScheme>,
     watchers: Vec<LocationScheme>,
     witness_threshold: u64,
@@ -122,25 +122,7 @@ pub async fn handle_init(
         watcher: watcher_config,
     };
 
-    let keys = match &keys_file {
-        Some(file_path) => {
-            let contents = fs::read_to_string(file_path).map_err(|_e| {
-                IdentifierSubcommandError::ArgumentsError(format!(
-                    "File {} doesn't exist",
-                    file_path.to_str().unwrap()
-                ))
-            })?;
-            serde_json::from_str(&contents).map_err(|_e| {
-                IdentifierSubcommandError::ArgumentsError(
-                    "Wrong format of file with seeds".to_string(),
-                )
-            })?
-        }
-        None => {
-            // println!("Generating keypairs for {}", &alias);
-            KeysConfig::default()
-        }
-    };
+    let keys = keys_config.unwrap_or_default();
 
     // Compute kel database path
     let mut store_path = working_directory()?;

@@ -10,7 +10,7 @@ use tabled::{builder::Builder, settings::Style};
 use url::Url;
 
 use crate::{
-    export::{handle_export, ExportError},
+    export::{handle_export, handle_import, ExportError},
     init::{handle_init, KeysConfig},
     keri::KeriError,
     resolve::{self, handle_resolve, OobiRoles},
@@ -53,6 +53,12 @@ pub enum IdentifierCommand {
     },
     Export {
         alias: String,
+    },
+    Import {
+        /// Alias for imported identifier
+        alias: String,
+        /// JSON produced by export command
+        data: String,
     },
 }
 
@@ -164,9 +170,28 @@ pub async fn process_identifier_command(
             let witnesses_oobis = find_oobis_for_urls(witness).await?;
 
             let watchers_oobis = find_oobis_for_urls(watcher).await?;
+
+            let seed_conf = init_seed_file.map(|seed_path| {
+                let contents = fs::read_to_string(&seed_path)
+                    .map_err(|_e| {
+                        IdentifierSubcommandError::ArgumentsError(format!(
+                            "File {} doesn't exist",
+                            seed_path.to_str().unwrap()
+                        ))
+                    })
+                    .unwrap();
+                serde_json::from_str(&contents)
+                    .map_err(|_e| {
+                        IdentifierSubcommandError::ArgumentsError(
+                            "Wrong format of file with seeds".to_string(),
+                        )
+                    })
+                    .unwrap()
+            });
+
             handle_init(
                 alias,
-                init_seed_file,
+                seed_conf,
                 witnesses_oobis,
                 watchers_oobis,
                 witness_threshold,
@@ -213,6 +238,10 @@ pub async fn process_identifier_command(
         IdentifierCommand::Export { alias } => {
             let exported = handle_export(&alias)?;
             println!("{}", serde_json::to_string_pretty(&exported).unwrap());
+            Ok(())
+        }
+        IdentifierCommand::Import { data, alias } => {
+            handle_import(&alias, &data).await?;
             Ok(())
         }
     }
