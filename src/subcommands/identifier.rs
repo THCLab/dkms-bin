@@ -26,10 +26,10 @@ pub enum IdentifierCommand {
         /// File with seed of the keys: current and next
         #[arg(long)]
         from_seed_file: Option<PathBuf>,
-        /// Url of the witness
+        /// The URL of the witness
         #[arg(long)]
         witness_url: Vec<Url>,
-        /// Url of the watcher
+        /// The URL of the watcher
         #[arg(long)]
         watcher_url: Vec<Url>,
         /// Natural number specifying the minimum witnesses needed to confirm a KEL event
@@ -142,7 +142,16 @@ pub async fn process_identifier_command(
                 ));
             };
 
-            let witness_threshold = witness_threshold.unwrap_or(1);
+            let witness_threshold = match witness_threshold {
+                Some(n) => n,
+                None => {
+                    if witness.is_empty() {
+                        0
+                    } else {
+                        1
+                    }
+                }
+            };
 
             let witnesses_oobis = find_oobis_for_urls(witness).await?;
 

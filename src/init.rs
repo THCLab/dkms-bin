@@ -2,7 +2,7 @@ use std::{
     error::Error,
     fmt::Display,
     fs::{self, File},
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     keri::{setup_identifier, KeriError},
     subcommands::identifier::IdentifierSubcommandError,
-    utils::{parse_json_arguments, working_directory},
+    utils::working_directory,
     CliError,
 };
 
