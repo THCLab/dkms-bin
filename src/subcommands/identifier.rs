@@ -5,20 +5,16 @@ use std::{
 };
 
 use clap::Subcommand;
-use keri_controller::{IdentifierPrefix, LocationScheme};
-use serde_json::json;
+use keri_controller::LocationScheme;
 use tabled::{builder::Builder, settings::Style};
 use url::Url;
 
 use crate::{
-    export::handle_export,
+    export::{handle_export, ExportError},
     init::{handle_init, KeysConfig},
     keri::KeriError,
     resolve::{self, handle_resolve, OobiRoles},
-    utils::{
-        handle_info, load, load_next_seed, load_next_signer, load_seed, load_signer,
-        working_directory, LoadingError,
-    },
+    utils::{handle_info, working_directory, LoadingError},
 };
 
 #[derive(Subcommand)]
@@ -90,6 +86,8 @@ pub enum IdentifierSubcommandError {
     LoadingError(#[from] LoadingError),
     #[error(transparent)]
     KeriError(#[from] KeriError),
+    #[error(transparent)]
+    Export(#[from] ExportError),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -213,7 +211,7 @@ pub async fn process_identifier_command(
             Ok(())
         }
         IdentifierCommand::Export { alias } => {
-            let exported = handle_export(&alias);
+            let exported = handle_export(&alias)?;
             match File::create(format!("{}.json", &alias)) {
                 Ok(mut file) => {
                     if let Err(e) =

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi};
+use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
 
 use crate::{
     keri::KeriError, subcommands::identifier::IdentifierSubcommandError, utils::load, CliError,
@@ -63,21 +63,25 @@ pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliE
 
 pub fn handle_oobi(alias: &str, oobi_command: &Option<OobiRoles>) -> Result<Vec<Oobi>, CliError> {
     let identifier = load(alias)?;
-    let filter_locations = |identifiers: Vec<IdentifierPrefix>| -> Result<Vec<Oobi>, CliError> {
-        Ok(identifiers
-            .into_iter()
-            .flat_map(|id| identifier.get_location(&id).unwrap())
-            .map(Oobi::Location)
-            .collect())
-    };
 
     match oobi_command {
-        Some(OobiRoles::Witness) => filter_locations(witnesses(&identifier)?),
-        Some(OobiRoles::Watcher) => filter_locations(watcher(&identifier)?),
-        Some(OobiRoles::Messagebox) => filter_locations(mesagkesto(&identifier)?),
+        Some(OobiRoles::Witness) => Ok(find_locations(&identifier, witnesses(&identifier)?)
+            .into_iter()
+            .map(Oobi::Location)
+            .collect()),
+        Some(OobiRoles::Watcher) => Ok(find_locations(&identifier, watcher(&identifier)?)
+            .into_iter()
+            .map(Oobi::Location)
+            .collect()),
+        Some(OobiRoles::Messagebox) => Ok(find_locations(&identifier, mesagkesto(&identifier)?)
+            .into_iter()
+            .map(Oobi::Location)
+            .collect()),
         None => {
             let witnesses = witnesses(&identifier)?;
-            let locations = filter_locations(witnesses.clone())?;
+            let locations = find_locations(&identifier, witnesses.clone())
+                .into_iter()
+                .map(Oobi::Location);
             let witnesses_oobi = witnesses.clone().into_iter().map(|cid| {
                 Oobi::EndRole(EndRole {
                     eid: cid.clone(),
@@ -88,4 +92,14 @@ pub fn handle_oobi(alias: &str, oobi_command: &Option<OobiRoles>) -> Result<Vec<
             Ok(locations.into_iter().chain(witnesses_oobi).collect())
         }
     }
+}
+
+pub fn find_locations<I: IntoIterator<Item = IdentifierPrefix>>(
+    identifier: &Identifier,
+    identifiers: I,
+) -> Vec<LocationScheme> {
+    identifiers
+        .into_iter()
+        .flat_map(|id| identifier.get_location(&id).unwrap())
+        .collect()
 }

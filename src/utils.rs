@@ -2,13 +2,17 @@ use std::{fs, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use keri_controller::{
-    config::ControllerConfig, controller::Controller, identifier::Identifier, IdentifierPrefix,
-    SeedPrefix,
+    config::ControllerConfig,
+    controller::Controller,
+    identifier::{mechanics::MechanicsError, Identifier},
+    IdentifierPrefix, LocationScheme, SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
 use thiserror::Error;
+
+use crate::resolve::find_locations;
 
 #[derive(Error, Debug)]
 pub enum LoadingError {
@@ -21,11 +25,13 @@ pub enum LoadingError {
     #[error("Parsing error: {0}")]
     ParsingError(String),
     #[error("Controller error: {0}")]
-    ControllerError(keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_controller::error::ControllerError),
     #[error("Signer error: {0}")]
     SignerError(String),
     #[error("Can't load home path")]
     HomePath,
+    #[error(transparent)]
+    Mechanics(#[from] MechanicsError),
 }
 
 pub fn working_directory() -> Result<PathBuf, LoadingError> {
@@ -135,10 +141,12 @@ pub fn load_next_signer(alias: &str) -> Result<Signer, LoadingError> {
 
 pub fn handle_info(alias: &str) -> Result<(), LoadingError> {
     let cont = load(alias)?;
+    let (witness_locations, witness_threshold) = collect_witness_data(&cont)?;
+    let watchers = collect_watchers_data(&cont)?;
     let info = if let Some(reg) = cont.registry_id() {
-        json!({"id": cont.id(), "registry": reg})
+        json!({"id": cont.id(), "registry": reg, "witnesses" : witness_locations, "witness_threshold": witness_threshold, "watchers": watchers})
     } else {
-        json!({"id": cont.id()})
+        json!({"id": cont.id(), "witnesses" : witness_locations, "witness_threshold": witness_threshold, "watchers": watchers})
     };
     println!("{}", serde_json::to_string_pretty(&info).unwrap());
 
@@ -175,6 +183,35 @@ pub fn extract_objects<T: DeserializeOwned>(
         },
         _ => Err(ExtractionError::UnexpectedJsonValue),
     }
+}
+
+pub fn collect_witness_data(
+    identifier: &Identifier,
+) -> Result<(Vec<LocationScheme>, u64), LoadingError> {
+    let state = identifier.find_state(identifier.id())?;
+    let witness_oobi = find_locations(
+        &identifier,
+        state
+            .witness_config
+            .witnesses
+            .into_iter()
+            .map(IdentifierPrefix::Basic),
+    );
+    let witness_threshold = state.witness_config.tally;
+    let witness_threshold = match witness_threshold {
+        keri_core::event::sections::threshold::SignatureThreshold::Simple(i) => i,
+        keri_core::event::sections::threshold::SignatureThreshold::Weighted(
+            _weighted_threshold,
+        ) => {
+            todo!()
+        }
+    };
+    Ok((witness_oobi, witness_threshold))
+}
+
+pub fn collect_watchers_data(identifier: &Identifier) -> Result<Vec<LocationScheme>, LoadingError> {
+    let watchers = identifier.get_role_location(identifier.id(), keri_core::oobi::Role::Watcher)?;
+    Ok(watchers)
 }
 
 pub fn parse_json_arguments<T: DeserializeOwned>(
