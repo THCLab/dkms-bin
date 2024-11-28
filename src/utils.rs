@@ -97,14 +97,28 @@ pub fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
     Ok(cont)
 }
 
-pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
+pub fn load_seed(alias: &str) -> Result<SeedPrefix, LoadingError> {
     let mut path = working_directory()?;
     path.push(alias);
     path.push("priv_key");
     let sk_str = fs::read_to_string(path)?;
-    let seed: SeedPrefix = sk_str
+    sk_str
         .parse()
-        .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))?;
+        .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))
+}
+
+pub fn load_next_seed(alias: &str) -> Result<SeedPrefix, LoadingError> {
+    let mut path = working_directory()?;
+    path.push(alias);
+    path.push("next_priv_key");
+    let sk_str = fs::read_to_string(path)?;
+    sk_str
+        .parse()
+        .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))
+}
+
+pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
+    let seed: SeedPrefix = load_seed(alias)?;
     let signer =
         Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))?;
 
@@ -112,13 +126,7 @@ pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
 }
 
 pub fn load_next_signer(alias: &str) -> Result<Signer, LoadingError> {
-    let mut path = working_directory()?;
-    path.push(alias);
-    path.push("next_priv_key");
-    let sk_str = fs::read_to_string(path)?;
-    let seed: SeedPrefix = sk_str
-        .parse()
-        .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))?;
+    let seed = load_next_seed(alias)?;
     let signer =
         Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))?;
 

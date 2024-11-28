@@ -5,15 +5,20 @@ use std::{
 };
 
 use clap::Subcommand;
-use keri_controller::LocationScheme;
+use keri_controller::{IdentifierPrefix, LocationScheme};
+use serde_json::json;
 use tabled::{builder::Builder, settings::Style};
 use url::Url;
 
 use crate::{
+    export::handle_export,
     init::{handle_init, KeysConfig},
     keri::KeriError,
     resolve::{self, handle_resolve, OobiRoles},
-    utils::{handle_info, working_directory, LoadingError},
+    utils::{
+        handle_info, load, load_next_seed, load_next_signer, load_seed, load_signer,
+        working_directory, LoadingError,
+    },
 };
 
 #[derive(Subcommand)]
@@ -40,13 +45,18 @@ pub enum IdentifierCommand {
         init_seed_file: Option<PathBuf>,
     },
     /// Show the identifier details of a specified alias
-    Info { alias: String },
+    Info {
+        alias: String,
+    },
     /// List all aliases and their corresponding identifiers
     List,
     /// List identifier OOBIs
     Oobi {
         #[command(subcommand)]
         command: OobiCommands,
+    },
+    Export {
+        alias: String,
     },
 }
 
@@ -200,6 +210,21 @@ pub async fn process_identifier_command(
                 },
                 OobiCommands::Resolve { alias, file } => handle_resolve(&alias, file).await?,
             };
+            Ok(())
+        }
+        IdentifierCommand::Export { alias } => {
+            let exported = handle_export(&alias);
+            match File::create(format!("{}.json", &alias)) {
+                Ok(mut file) => {
+                    if let Err(e) =
+                        file.write_all(&serde_json::to_string_pretty(&exported).unwrap().as_bytes())
+                    {
+                        println!("Failed to write to file: {}", e);
+                    }
+                }
+                Err(e) => println!("Failed to create file: {}", e),
+            }
+
             Ok(())
         }
     }
