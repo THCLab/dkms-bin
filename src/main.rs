@@ -79,7 +79,7 @@ async fn main() -> Result<(), CliError> {
     let help_text = help::generate_help_text();
 
     let command = Cli::command()
-        .help_template(&help::HELP_TEMPLATE.replace("{commands}", &help_text))
+        .help_template(help::HELP_TEMPLATE.replace("{commands}", help_text))
         .get_matches();
 
     let cli: Cli = FromArgMatches::from_arg_matches(&command).unwrap();
@@ -93,7 +93,7 @@ async fn main() -> Result<(), CliError> {
         None => {
             // If no subcommand is provided, display the help message
             Cli::command()
-                .help_template(&help::HELP_TEMPLATE.replace("{commands}", &help_text))
+                .help_template(help::HELP_TEMPLATE.replace("{commands}", help_text))
                 .print_help()
                 .unwrap();
         }

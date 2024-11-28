@@ -20,9 +20,9 @@ pub struct IdentifierExport {
     witness_threshold: u64,
 }
 pub fn handle_export(alias: &str) -> Result<IdentifierExport, ExportError> {
-    let identifier = load(&alias)?;
-    let current = load_seed(&alias)?;
-    let next = load_next_seed(&alias)?;
+    let identifier = load(alias)?;
+    let current = load_seed(alias)?;
+    let next = load_next_seed(alias)?;
 
     let (witness_locations, witness_threshold) = collect_witness_data(&identifier)?;
     let watchers = collect_watchers_data(&identifier)?;

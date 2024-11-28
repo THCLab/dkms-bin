@@ -190,7 +190,7 @@ pub fn collect_witness_data(
 ) -> Result<(Vec<LocationScheme>, u64), LoadingError> {
     let state = identifier.find_state(identifier.id())?;
     let witness_oobi = find_locations(
-        &identifier,
+        identifier,
         state
             .witness_config
             .witnesses

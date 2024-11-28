@@ -38,7 +38,7 @@ pub fn generate_help_text() -> &'static str {
                 nested_name, nested_about
             ));
         }
-        help_text.push_str("\n");
+        help_text.push('\n');
     }
 
     // Make help_text a static string by leaking it (safe for help text)

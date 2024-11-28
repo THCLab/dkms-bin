@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, sync::Arc};
 
-use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi};
+use keri_controller::{EndRole, IdentifierPrefix, Oobi};
 use keri_core::actor::prelude::SelfAddressingIdentifier;
 use serde_json::Value;
 
@@ -22,17 +22,6 @@ pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-pub async fn handle_tel_incept(alias: &str) -> Result<(), CliError> {
-    let mut id = load(alias)?;
-    let signer = Arc::new(load_signer(alias)?);
-    crate::keri::incept_registry(&mut id, signer).await?;
-    let registry_id = id.registry_id().as_ref().unwrap().to_string();
-    // Save registry identifier
-    save_registry(alias, &registry_id)?;
-
-    Ok(())
-}
-
 pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
@@ -44,7 +33,7 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
         let said: SelfAddressingIdentifier = digest.parse().map_err(SaidError::InvalidSaid)?;
 
         let signer = Arc::new(load_signer(alias)?);
-        if let None = id.registry_id() {
+        if id.registry_id().is_none() {
             // incept TEL if not incepted
             crate::keri::incept_registry(&mut id, signer.clone()).await?;
             let registry_id = id.registry_id().as_ref().unwrap().to_string();

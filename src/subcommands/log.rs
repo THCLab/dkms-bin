@@ -5,7 +5,7 @@ use keri_controller::IdentifierPrefix;
 
 use crate::{
     kel::{handle_kel_query, handle_rotate},
-    tel::{self, handle_query, handle_tel_oobi},
+    tel::{handle_query, handle_tel_oobi},
     CliError,
 };
 

@@ -110,7 +110,7 @@ async fn find_oobis_for_urls<I>(urls: I) -> Result<Vec<LocationScheme>, InitErro
 where
     I: IntoIterator<Item = Url>,
 {
-    futures::future::try_join_all(urls.into_iter().map(|url| find_oobi(url))).await
+    futures::future::try_join_all(urls.into_iter().map(find_oobi)).await
 }
 
 pub async fn process_identifier_command(
@@ -128,7 +128,7 @@ pub async fn process_identifier_command(
             match (&init_seed_file, &seed_file) {
                 (None, Some(path)) => {
                     let kc = KeysConfig::default();
-                    let mut file = File::create(&path)?;
+                    let mut file = File::create(path)?;
                     file.write_all(&serde_json::to_vec(&kc).unwrap())?;
                     println!("Seed generated and saved in {}", &path.to_str().unwrap());
                     return Ok(());
@@ -215,7 +215,7 @@ pub async fn process_identifier_command(
             match File::create(format!("{}.json", &alias)) {
                 Ok(mut file) => {
                     if let Err(e) =
-                        file.write_all(&serde_json::to_string_pretty(&exported).unwrap().as_bytes())
+                        file.write_all(serde_json::to_string_pretty(&exported).unwrap().as_bytes())
                     {
                         println!("Failed to write to file: {}", e);
                     }

@@ -114,7 +114,7 @@ pub async fn setup_identifier(
 
 pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result<(), KeriError> {
     // Init tel
-    let (reg_id, ixn) = id.incept_registry()?;
+    let (_reg_id, ixn) = id.incept_registry()?;
     let signature = SelfSigningPrefix::new(
         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         signer.sign(&ixn)?,
