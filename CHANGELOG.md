@@ -2,11 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2024-11-28
+
+### 🚀 Features
+
+- Print help if no commands
+- Add kel find command
+- Add expand command
+- Describe attachments in expand command
+- Customize help output
+- Add init --seed-file option
+
+### 🐛 Bug Fixes
+
+- Restrict signing to valid JSON inputs
+- Better errors in issue command
+- Remove whitespaces in expand command
+- Better error from said command
+- Fix parsing seed file
+
+### 🚜 Refactor
+
+- Better seed command errors
+- Add identifier command
+- Add log command
+- Add data command
+- Add said command
+- Add key command
+- Add mesagkesto command
+- Add error module
+- Move issue command
+- Remove file option from sad command
+- Rename data issue option
+
+### ⚙️ Miscellaneous Tasks
+
+- Improve documentation in the help for init
+- Bump cesrox version
+
+### Ichore
+
+- Bump cesrox version
+
 ## [0.3.0] - 2024-11-20
 
 ### 🚀 Features
 
-- Add verify command
 - Add list and info commands
 
 ### 🐛 Bug Fixes
@@ -19,11 +60,24 @@ All notable changes to this project will be documented in this file.
 
 ### 🚜 Refactor
 
+- Fix clippy warnings
+- Better list command output
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.3.0 version
+
+## [0.2.1] - 2024-11-15
+
+### 🚀 Features
+
+- Add verify command
+
+### 🚜 Refactor
+
 - Remove unwraps
 - Better error messages
 - Minor changes
-- Fix clippy warnings
-- Better list command output
 
 ### ⚙️ Miscellaneous Tasks
 
