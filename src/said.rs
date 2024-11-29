@@ -20,12 +20,19 @@ pub enum SaidError {
 pub fn handle_sad(input: &str) -> Result<String, SaidError> {
     let mut map: IndexMap<String, serde_json::Value> =
         serde_json::from_str(input).map_err(|_| SaidError::InvalidJson(input.to_string()))?;
+    compute_and_update_digest(&mut map)?;
+    Ok(serde_json::to_string(&map)?)
+}
+
+pub fn compute_and_update_digest(
+    map: &mut IndexMap<String, serde_json::Value>,
+) -> Result<(), SaidError> {
     if let Some(_dig) = map.get("d") {
         let code = HashFunctionCode::Blake3_256;
         map["d"] = serde_json::Value::String("#".repeat(code.full_size()));
         let said = HashFunction::from(code).derive(&serde_json::to_vec(&map)?);
         map["d"] = serde_json::Value::String(said.to_string());
-        Ok(serde_json::to_string(&map)?)
+        Ok(())
     } else {
         Err(SaidError::MissingSaidField)
     }

@@ -2,11 +2,10 @@ use std::{fs::File, io::Write, sync::Arc};
 
 use keri_controller::{EndRole, IdentifierPrefix, Oobi};
 use keri_core::actor::prelude::SelfAddressingIdentifier;
-use serde_json::Value;
 
 use crate::{
     keri::{issue, query_tel},
-    said::SaidError,
+    said::{compute_and_update_digest, SaidError},
     utils::{load, load_signer, working_directory},
     CliError,
 };
@@ -25,13 +24,9 @@ pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), CliError> {
 pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
-    if let Ok(root) = serde_json::from_str::<Value>(data) {
-        let digest: &str = root
-            .get("d")
-            .and_then(|v| v.as_str())
-            .ok_or(CliError::MissingDigest)?;
-        let said: SelfAddressingIdentifier = digest.parse().map_err(SaidError::InvalidSaid)?;
-
+    if let Ok(mut root) =
+        serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data)
+    {
         let signer = Arc::new(load_signer(alias)?);
         if id.registry_id().is_none() {
             // incept TEL if not incepted
@@ -39,11 +34,42 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
             let registry_id = id.registry_id().as_ref().unwrap().to_string();
             save_registry(alias, &registry_id)?;
         };
+        insert_issuer_and_registry(id.id(), id.registry_id().unwrap(), &mut root)?;
+        let digest: &str = root
+            .get("d")
+            .and_then(|v| v.as_str())
+            .ok_or(CliError::MissingDigest)?;
+        let said: SelfAddressingIdentifier = digest.parse().map_err(SaidError::InvalidSaid)?;
+
         issue(&mut id, said, signer).await?;
+        println!("{}", serde_json::to_string(&root).unwrap());
     } else {
         println!("Wrong json format: {}", data);
     };
     Ok(())
+}
+
+fn insert_issuer_and_registry(
+    issuer: &IdentifierPrefix,
+    registry: &IdentifierPrefix,
+    data: &mut indexmap::IndexMap<String, serde_json::Value>,
+) -> Result<(), SaidError> {
+    data.insert_before(
+        0,
+        "i".to_string(),
+        serde_json::Value::String(issuer.to_string()),
+    );
+    data.insert_before(
+        1,
+        "ri".to_string(),
+        serde_json::Value::String(registry.to_string()),
+    );
+    data.insert_before(
+        2,
+        "d".to_string(),
+        serde_json::Value::String("".to_string()),
+    );
+    compute_and_update_digest(data)
 }
 
 pub async fn handle_query(
