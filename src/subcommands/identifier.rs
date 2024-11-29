@@ -42,9 +42,7 @@ pub enum IdentifierCommand {
         init_seed_file: Option<PathBuf>,
     },
     /// Show the identifier details of a specified alias
-    Info {
-        alias: String,
-    },
+    Info { alias: String },
     /// List all aliases and their corresponding identifiers
     List,
     /// List identifier OOBIs
@@ -52,9 +50,9 @@ pub enum IdentifierCommand {
         #[command(subcommand)]
         command: OobiCommands,
     },
-    Export {
-        alias: String,
-    },
+    /// Export identifier data to JSON
+    Export { alias: String },
+    /// Import identifier data from JSON
     Import {
         /// Alias for imported identifier
         alias: String,
