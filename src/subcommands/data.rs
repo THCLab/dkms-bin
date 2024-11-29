@@ -15,8 +15,9 @@ pub enum DataCommand {
     Sign {
         #[arg(short, long)]
         alias: String,
+        /// JSON-based data to be signed
         #[arg(short, long)]
-        data: String,
+        message: String,
     },
     /// Verifies provided CESR stream
     Verify {
@@ -36,14 +37,18 @@ pub enum DataCommand {
     Issue {
         #[arg(short, long)]
         alias: String,
-        #[arg(short = 'c', long)]
-        acdc_credential_json: String,
+        /// ACDC credential payload in JSON format to be processed
+        #[arg(short, long)]
+        message: String,
     },
 }
 
 pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> {
     match command {
-        DataCommand::Sign { alias, data } => {
+        DataCommand::Sign {
+            alias,
+            message: data,
+        } => {
             println!("{}", handle_sign(alias, &data)?);
         }
         DataCommand::Verify {
@@ -75,7 +80,7 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
         DataCommand::Expand { cesr } => expand::expand(&cesr),
         DataCommand::Issue {
             alias,
-            acdc_credential_json: credential_json,
+            message: credential_json,
         } => handle_issue(&alias, &credential_json).await?,
     }
     Ok(())
