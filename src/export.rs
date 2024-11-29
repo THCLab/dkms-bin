@@ -41,9 +41,8 @@ pub fn handle_export(alias: &str) -> Result<IdentifierExport, ExportError> {
 }
 
 pub async fn handle_import(alias: &str, data: &str) -> Result<(), IdentifierSubcommandError> {
-    let imported: IdentifierExport = serde_json::from_str(data).map_err(|_e| {
-        IdentifierSubcommandError::ArgumentsError("Invalid json exported data".to_string())
-    })?;
+    let imported: IdentifierExport = serde_json::from_str(data)
+        .map_err(|_e| IdentifierSubcommandError::ArgumentsError("Invalid JSON".to_string()))?;
     let kc = KeysConfig {
         current: imported.current_seed,
         next: imported.next_seed,

@@ -1,3 +1,4 @@
+use std::io::{self, IsTerminal, Read};
 use std::{
     fs::{self, File},
     io::Write,
@@ -58,7 +59,7 @@ pub enum IdentifierCommand {
         /// Alias for imported identifier
         alias: String,
         /// JSON produced by export command
-        data: String,
+        data: Option<String>,
     },
 }
 
@@ -240,9 +241,29 @@ pub async fn process_identifier_command(
             println!("{}", serde_json::to_string_pretty(&exported).unwrap());
             Ok(())
         }
-        IdentifierCommand::Import { data, alias } => {
-            handle_import(&alias, &data).await?;
-            Ok(())
-        }
+        IdentifierCommand::Import { data, alias } => match data {
+            Some(data) => {
+                handle_import(&alias, &data).await?;
+                Ok(())
+            }
+            None => {
+                if io::stdin().is_terminal() {
+                    eprintln!(
+                        "Error: No input provided. Provide an argument or pipe data via stdin."
+                    );
+                    std::process::exit(1);
+                }
+
+                let mut buffer = String::new();
+                io::stdin().read_to_string(&mut buffer).map_err(|e| {
+                    IdentifierSubcommandError::ArgumentsError(format!(
+                        "Failed to read from stdin: {}",
+                        e
+                    ))
+                })?;
+                handle_import(&alias, &buffer).await?;
+                Ok(())
+            }
+        },
     }
 }
