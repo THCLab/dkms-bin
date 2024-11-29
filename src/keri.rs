@@ -278,8 +278,8 @@ pub async fn issue(
         .find_state(identifier.id())?
         .witness_config
         .witnesses;
-    if let Some(witness) = witnesses.first() {
-        let _qry = query_mailbox(identifier, km.clone(), witness).await?;
+    for witness in witnesses {
+        let _qry = query_mailbox(identifier, km.clone(), &witness).await?;
     }
 
     identifier.notify_backers().await?;

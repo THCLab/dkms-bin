@@ -1,8 +1,7 @@
 use std::{sync::Arc, thread::sleep, time::Duration};
 
 use keri_controller::{
-    communication::SendingError, error::ControllerError, identifier, IdentifierPrefix, Oobi,
-    TelState,
+    communication::SendingError, error::ControllerError, IdentifierPrefix, Oobi, TelState,
 };
 use keri_core::{
     event::sections::seal::EventSeal,
