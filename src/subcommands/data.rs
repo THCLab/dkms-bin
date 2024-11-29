@@ -26,7 +26,7 @@ pub enum DataCommand {
         alias: String,
         #[arg(short, long)]
         oobi: Vec<String>,
-        /// JSON-based data with attached CESR stream to be verified
+        /// JSON-based data with CESR attachments to be verified
         #[arg(short, long)]
         message: Option<String>,
     },
