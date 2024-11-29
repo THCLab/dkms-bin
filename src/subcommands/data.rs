@@ -1,8 +1,12 @@
 use clap::Subcommand;
 
 use crate::{
-    expand, sign::handle_sign, tel::handle_issue, verification_status::VerificationStatus,
-    verify::handle_verify, CliError,
+    expand,
+    sign::handle_sign,
+    tel::handle_issue,
+    verification_status::VerificationStatus,
+    verify::{handle_verify, VerifyHandleError},
+    CliError,
 };
 
 #[derive(Subcommand)]
@@ -55,6 +59,9 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             .await
             {
                 Ok(result) => VerificationStatus::from(result),
+                Err(VerifyHandleError::NoWatchersConfigured(id)) => {
+                    return Err(CliError::NoWatchers(id))
+                }
                 Err(e) => VerificationStatus::from(e),
             };
             match &status {

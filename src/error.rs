@@ -1,5 +1,5 @@
 use config_file::ConfigFileError;
-use keri_controller::identifier::query::WatcherResponseError;
+use keri_controller::{identifier::query::WatcherResponseError, IdentifierPrefix};
 use thiserror::Error;
 
 use crate::{
@@ -47,4 +47,6 @@ pub enum CliError {
     KelGetting(Vec<WatcherResponseError>),
     #[error("{0}")]
     IdentifierCommand(#[from] IdentifierSubcommandError),
+    #[error("No watchers are configured for identifier {0}. Can't find TEL")]
+    NoWatchers(IdentifierPrefix),
 }

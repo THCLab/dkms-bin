@@ -1,7 +1,8 @@
 use std::{sync::Arc, thread::sleep, time::Duration};
 
 use keri_controller::{
-    communication::SendingError, error::ControllerError, IdentifierPrefix, Oobi, TelState,
+    communication::SendingError, error::ControllerError, identifier, IdentifierPrefix, Oobi,
+    TelState,
 };
 use keri_core::{
     event::sections::seal::EventSeal,
@@ -35,6 +36,8 @@ pub enum VerifyHandleError {
     List(ErrorList),
     #[error("Signature doesn't match provided data")]
     FaultySignatures,
+    #[error("No watchers are configured for {0}")]
+    NoWatchersConfigured(IdentifierPrefix),
 }
 
 impl From<VerificationError> for VerifyHandleError {
@@ -123,9 +126,13 @@ pub async fn handle_verify(
         match who_id.verify_from_cesr(&message) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
             Err(ControllerError::VerificationError(e)) => {
-                if e.iter()
-                    .any(|(_e, _)| matches!(VerificationError::VerificationFailure, _e))
-                {
+                if e.iter().any(|(e, _)| {
+                    if let VerificationError::VerificationFailure = e {
+                        true
+                    } else {
+                        false
+                    }
+                }) {
                     return Err(VerifyHandleError::FaultySignatures);
                 };
                 let err_list = ErrorList(
@@ -168,6 +175,24 @@ pub async fn handle_verify(
         let issuer: IdentifierPrefix = fields.issuer_identifier.parse().unwrap();
         let said: SelfAddressingIdentifier = fields.digest.parse().unwrap();
         let registry_id: SelfAddressingIdentifier = fields.registry_id.parse().unwrap();
+        // Try to verify vc
+        match who_id.find_vc_state(&said) {
+            Ok(Some(state)) => {
+                return match_tel_state(Some(state));
+            }
+            _ => {
+                // check if any watcher was configured
+                match who_id.watchers() {
+                    Ok(watchers) if watchers.is_empty() => {
+                        return Err(VerifyHandleError::NoWatchersConfigured(who_id.id().clone()))
+                    }
+                    Ok(_watchers) => {}
+                    Err(_) => {
+                        return Err(VerifyHandleError::NoWatchersConfigured(who_id.id().clone()))
+                    }
+                };
+            }
+        }
 
         let signer = Arc::new(load_signer(alias).unwrap());
         for _i in 0..5 {
@@ -183,12 +208,16 @@ pub async fn handle_verify(
         }
 
         let st = who_id.find_vc_state(&said).unwrap();
-        match st {
-            Some(TelState::Issued(_said)) => Ok(ACDCState::Issued),
-            Some(TelState::NotIssued) => Ok(ACDCState::NotFound),
-            Some(TelState::Revoked) => Ok(ACDCState::Revoked),
-            None => Ok(ACDCState::NotFound),
-        }
+        match_tel_state(st)
+    }
+}
+
+fn match_tel_state(ts: Option<TelState>) -> Result<ACDCState, VerifyHandleError> {
+    match ts {
+        Some(TelState::Issued(_said)) => Ok(ACDCState::Issued),
+        Some(TelState::NotIssued) => Ok(ACDCState::NotFound),
+        Some(TelState::Revoked) => Ok(ACDCState::Revoked),
+        None => Ok(ACDCState::NotFound),
     }
 }
 
