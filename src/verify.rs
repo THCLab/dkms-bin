@@ -1,7 +1,8 @@
 use std::{sync::Arc, thread::sleep, time::Duration};
 
 use keri_controller::{
-    communication::SendingError, error::ControllerError, IdentifierPrefix, Oobi, TelState,
+    communication::SendingError, error::ControllerError, identifier::Identifier, IdentifierPrefix,
+    LocationScheme, Oobi, TelState,
 };
 use keri_core::{
     event::sections::seal::EventSeal,
@@ -12,6 +13,7 @@ use serde::Deserialize;
 
 use crate::{
     keri::query_tel,
+    resolve::find_locations,
     utils::{load, load_signer, parse_json_arguments},
 };
 
@@ -147,9 +149,7 @@ pub async fn handle_verify(
                                     },
                                 )) => {
                                     // check if identifier oobi is known
-                                    let oobis = who_id
-                                        .get_end_role(prefix, keri_core::oobi::Role::Witness)
-                                        .unwrap();
+                                    let oobis = find_oobis(&who_id, prefix);
                                     if oobis.is_empty() {
                                         VerifyHandleError::MissingOobi(prefix.clone())
                                     } else {
@@ -194,11 +194,7 @@ pub async fn handle_verify(
             }
         }
 
-        // check if identifier oobi is known
-        let oobis = who_id
-            .get_end_role(&issuer, keri_core::oobi::Role::Witness)
-            .unwrap();
-        if oobis.is_empty() {
+        if find_oobis(&who_id, &issuer).is_empty() {
             return Err(VerifyHandleError::MissingOobi(issuer.clone()));
         };
 
@@ -218,6 +214,17 @@ pub async fn handle_verify(
         let st = who_id.find_vc_state(&said).unwrap();
         match_tel_state(st)
     }
+}
+
+fn find_oobis(who_id: &Identifier, issuer: &IdentifierPrefix) -> Vec<LocationScheme> {
+    let oobis = match who_id.find_state(&issuer) {
+        Ok(state) => state.witness_config.witnesses,
+        Err(_) => vec![],
+    };
+    find_locations(
+        &who_id,
+        oobis.into_iter().map(|i| IdentifierPrefix::Basic(i)),
+    )
 }
 
 fn match_tel_state(ts: Option<TelState>) -> Result<ACDCState, VerifyHandleError> {
