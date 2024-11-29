@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     keri::{setup_identifier, KeriError},
     subcommands::identifier::IdentifierSubcommandError,
+    tel::remove_registry,
     utils::working_directory,
     CliError,
 };
@@ -141,6 +142,7 @@ pub async fn handle_init(
     let id = handle_new_id(&keys, kel_config, &db_path).await;
     match id {
         Ok(id) => {
+            let _ = remove_registry(&alias);
             // Save next keys seed
             let mut nsk_path = store_path.clone();
             nsk_path.push("next_priv_key");

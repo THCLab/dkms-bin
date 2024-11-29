@@ -1,4 +1,8 @@
-use std::{fs::File, io::Write, sync::Arc};
+use std::{
+    fs::{self, File},
+    io::Write,
+    sync::Arc,
+};
 
 use keri_controller::{EndRole, IdentifierPrefix, Oobi};
 use keri_core::actor::prelude::SelfAddressingIdentifier;
@@ -18,6 +22,19 @@ pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), CliError> {
     reg_path.push("reg_id");
     let mut file = File::create(reg_path)?;
     file.write_all(registry_id.as_bytes())?;
+    Ok(())
+}
+
+pub fn remove_registry(alias: &str) -> Result<(), CliError> {
+    let mut store_path = working_directory()?;
+    store_path.push(alias);
+
+    let mut reg_path = store_path.clone();
+    reg_path.push("reg_id");
+
+    if fs::metadata(&reg_path).is_ok() {
+        fs::remove_file(reg_path)?;
+    };
     Ok(())
 }
 
