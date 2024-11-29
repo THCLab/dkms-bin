@@ -193,6 +193,14 @@ pub async fn handle_verify(
             }
         }
 
+        // check if identifier oobi is known
+        let oobis = who_id
+            .get_end_role(&issuer, keri_core::oobi::Role::Witness)
+            .unwrap();
+        if oobis.is_empty() {
+            return Err(VerifyHandleError::MissingOobi(issuer.clone()));
+        };
+
         let signer = Arc::new(load_signer(alias).unwrap());
         for _i in 0..5 {
             query_tel(&said, registry_id.clone(), &issuer, &who_id, signer.clone())
