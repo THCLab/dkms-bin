@@ -1,4 +1,5 @@
 use clap::Subcommand;
+use std::io::{self, IsTerminal, Read};
 
 use crate::{
     expand,
@@ -26,7 +27,7 @@ pub enum DataCommand {
         #[arg(short, long)]
         oobi: Vec<String>,
         #[arg(short, long)]
-        message: String,
+        message: Option<String>,
     },
     /// Presents CESR data in a human-readable format
     Expand {
@@ -56,18 +57,52 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             oobi,
             message,
         } => {
-            let status = match handle_verify(
-                &alias,
-                &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
-                message,
-            )
-            .await
-            {
-                Ok(result) => VerificationStatus::from(result),
-                Err(VerifyHandleError::NoWatchersConfigured(id)) => {
-                    return Err(CliError::NoWatchers(id))
+            let status = match message {
+                Some(message) => {
+                    println!("{}", message);
+                    match handle_verify(
+                        &alias,
+                        &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
+                        message,
+                    )
+                    .await
+                    {
+                        Ok(result) => VerificationStatus::from(result),
+                        Err(VerifyHandleError::NoWatchersConfigured(id)) => {
+                            return Err(CliError::NoWatchers(id))
+                        }
+                        Err(e) => VerificationStatus::from(e),
+                    }
                 }
-                Err(e) => VerificationStatus::from(e),
+                None => {
+                    if io::stdin().is_terminal() {
+                        eprintln!(
+                            "Error: No input provided. Provide an argument or pipe data via stdin."
+                        );
+                        std::process::exit(1);
+                    }
+
+                    let mut buffer = String::new();
+                    io::stdin().read_to_string(&mut buffer).map_err(|e| {
+                        CliError::Verification(VerificationStatus::Error {
+                            description: format!("Failed to read from stdin: {}", e),
+                        })
+                    })?;
+
+                    match handle_verify(
+                        &alias,
+                        &oobi.iter().map(|e| e.as_str()).collect::<Vec<_>>(),
+                        buffer,
+                    )
+                    .await
+                    {
+                        Ok(result) => VerificationStatus::from(result),
+                        Err(VerifyHandleError::NoWatchersConfigured(id)) => {
+                            return Err(CliError::NoWatchers(id))
+                        }
+                        Err(e) => VerificationStatus::from(e),
+                    }
+                }
             };
             match &status {
                 VerificationStatus::Ok { description: _ } => println!("{}", &status),

@@ -112,6 +112,7 @@ pub async fn handle_verify(
             },
         };
     }
+    let message = message.trim();
 
     // Parse cesr stream of message
     let (rest, cesr) = cesrox::parse(message.as_bytes()).unwrap();
