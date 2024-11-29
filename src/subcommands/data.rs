@@ -32,8 +32,9 @@ pub enum DataCommand {
     },
     /// Presents CESR data in a human-readable format
     Expand {
-        /// A CESR string, such as one produced by the issue or sign command
-        cesr: String,
+        /// JSON-based data with CESR attachments to be transformed into a readable format
+        #[arg(short, long)]
+        message: Option<String>,
     },
     /// Issue credential
     Issue {
@@ -113,7 +114,22 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
                 }
             }
         }
-        DataCommand::Expand { cesr } => expand::expand(&cesr),
+        DataCommand::Expand { message } => match message {
+            Some(message) => expand::expand(&message),
+            None => {
+                if io::stdin().is_terminal() {
+                    return Err(CliError::OptionOrStdinError("-m".to_string()));
+                }
+
+                let mut buffer = String::new();
+                io::stdin().read_to_string(&mut buffer).map_err(|e| {
+                    CliError::Verification(VerificationStatus::Error {
+                        description: format!("Failed to read from stdin: {}", e),
+                    })
+                })?;
+                expand::expand(&buffer)
+            }
+        },
         DataCommand::Issue {
             alias,
             message: credential_json,

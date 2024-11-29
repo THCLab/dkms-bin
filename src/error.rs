@@ -13,6 +13,8 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum CliError {
+    #[error("Error: No input provided. Use the {0} option or pipe data via stdin.")]
+    OptionOrStdinError(String),
     #[error(transparent)]
     ConfigUnparsable(#[from] ConfigFileError),
     #[error("Keys derivation error")]

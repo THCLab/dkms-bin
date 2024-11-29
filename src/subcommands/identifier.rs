@@ -1,7 +1,6 @@
 use std::io::{self, IsTerminal, Read};
 use std::{
-    fs::{self, File},
-    io::Write,
+    fs::{self},
     path::PathBuf,
 };
 
@@ -25,9 +24,6 @@ pub enum IdentifierCommand {
         /// Alias of the identifier used by the tool for internal purposes
         #[arg(short, long)]
         alias: Option<String>,
-        /// File with seed of the keys: current and next
-        #[arg(long)]
-        from_seed_file: Option<PathBuf>,
         /// The URL of the witness
         #[arg(long)]
         witness_url: Vec<Url>,
@@ -37,9 +33,6 @@ pub enum IdentifierCommand {
         /// Natural number specifying the minimum witnesses needed to confirm a KEL event
         #[arg(long)]
         witness_threshold: Option<u64>,
-        /// Generates json file with current and next keys seeds in provided path
-        #[arg(long)]
-        init_seed_file: Option<PathBuf>,
     },
     /// Show the identifier details of a specified alias
     Info { alias: String },
@@ -124,29 +117,10 @@ pub async fn process_identifier_command(
     match command {
         IdentifierCommand::Init {
             alias,
-            from_seed_file: init_seed_file,
             witness_url: witness,
             watcher_url: watcher,
             witness_threshold,
-            init_seed_file: seed_file,
         } => {
-            match (&init_seed_file, &seed_file) {
-                (None, Some(path)) => {
-                    let kc = KeysConfig::default();
-                    let mut file = File::create(path)?;
-                    file.write_all(&serde_json::to_vec(&kc).unwrap())?;
-                    println!("Seed generated and saved in {}", &path.to_str().unwrap());
-                    return Ok(());
-                }
-                (_, None) => (),
-                (Some(_), Some(_)) => {
-                    return Err(IdentifierSubcommandError::ArgumentsError(
-                        "You can specify only one of 'init_seed_file' or 'seed_file', but not both"
-                            .to_string(),
-                    ))
-                }
-            };
-
             let alias = if let Some(alias) = alias {
                 alias
             } else {
@@ -170,27 +144,9 @@ pub async fn process_identifier_command(
 
             let watchers_oobis = find_oobis_for_urls(watcher).await?;
 
-            let seed_conf = init_seed_file.map(|seed_path| {
-                let contents = fs::read_to_string(&seed_path)
-                    .map_err(|_e| {
-                        IdentifierSubcommandError::ArgumentsError(format!(
-                            "File {} doesn't exist",
-                            seed_path.to_str().unwrap()
-                        ))
-                    })
-                    .unwrap();
-                serde_json::from_str(&contents)
-                    .map_err(|_e| {
-                        IdentifierSubcommandError::ArgumentsError(
-                            "Wrong format of file with seeds".to_string(),
-                        )
-                    })
-                    .unwrap()
-            });
-
             handle_init(
                 alias,
-                seed_conf,
+                Some(KeysConfig::default()),
                 witnesses_oobis,
                 watchers_oobis,
                 witness_threshold,
