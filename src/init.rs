@@ -87,8 +87,8 @@ impl Default for KeysConfig {
     }
 }
 
-fn _ask_for_confirmation(prompt: &str) -> bool {
-    print!("{} ", prompt);
+fn ask_for_confirmation(prompt: &str) -> bool {
+    print!("{} (y|N)", prompt);
     std::io::stdout().flush().unwrap();
 
     let mut input = String::new();
@@ -128,7 +128,34 @@ pub async fn handle_init(
     // Compute kel database path
     let mut store_path = working_directory()?;
     store_path.push(&alias);
-    fs::create_dir_all(&store_path)?;
+
+    if !store_path.exists() {
+        fs::create_dir_all(&store_path)?;
+    }
+    if store_path.is_dir() {
+        match fs::read_dir(&store_path) {
+            Ok(mut entries) => {
+                if entries.next().is_some() {
+                    if ask_for_confirmation(&format!(
+                        "The alias '{}' already exists. Are you sure you want to overwrite it?",
+                        alias
+                    )) {
+                    } else {
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Err(e) => eprintln!("Error accessing directory: {}", e),
+        }
+    } else {
+        println!(
+            "Error: The path {:?} is not a directory",
+            store_path.to_str().unwrap()
+        );
+        std::process::exit(1);
+    }
+
+    println!("Initializing identifier for alias {:?}...", store_path);
     let mut db_path = store_path.clone();
     db_path.push("db");
 
