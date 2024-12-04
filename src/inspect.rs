@@ -91,7 +91,7 @@ fn readable_nontrans_receipt(pair: (PublicKey, Signature)) -> String {
     )
 }
 
-pub fn expand(cesr: &str) {
+pub fn inspect(cesr: &str) {
     let no_whitespace = cesr
         .chars()
         .filter(|c| !c.is_whitespace())
@@ -160,11 +160,11 @@ pub fn expand(cesr: &str) {
 }
 
 #[test]
-fn test_expand() {
+fn test_inspect() {
     let cesr_with_whitespaces = r#"{"hello":"world"}-FABEECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq0AAAAAAAAAAAA  AAAAAAAAAAAEECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq-AABAAArmG_maHPKlUvMXkJfEysM_ej84lWdbtJXYWlrOBkhM1td1idMU0wUIBm5XkaRIw78QmFHUrYoi_kkryhJJy8J-CABBDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp40BBFHf56jD6v15vWezesWY-RPj2ZiXGC-834wAp5TqeW-6VehAMvyAi9ojCfDr1OSYlAWTpEPY6SPfKFFKGUnbQJ"#;
-    expand(&cesr_with_whitespaces);
+    inspect(&cesr_with_whitespaces);
 
     let cesr_stream = r#"{"hello":"world"}-FABEECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq0AAAAAAAAAAAAAAAAAAAAAAAEECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq-AABAAArmG_maHPKlUvMXkJfEysM_ej84lWdbtJXYWlrOBkhM1td1idMU0wUIBm5XkaRIw78QmFHUrYoi_kkryhJJy8J-CABBDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp40BBFHf56jD6v15vWezesWY-RPj2ZiXGC-834wAp5TqeW-6VehAMvyAi9ojCfDr1OSYlAWTpEPY6SPfKFFKGUnbQJ"#;
     // let cesr_stream = r#"{"v":"KERI10JSON000159_","t":"icp","d":"EECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq","i":"EECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq","s":"0","kt":"1","k":["DI4mF-VUtO2lWrSgGxuslV0UDSNo_5UlcBScEQ-lhqQp"],"nt":"1","n":["EBQu8B_UuT_My1ZtYY-a4AK7cWAFSAfb3iuWPquch5lA"],"bt":"1","b":["BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4"],"c":[],"a":[]}-AABAAB2N9iNgROzLn-ikiyzQb1S2o04H7YnjlAVobikfEF_z9hg5-gK1yW-i1mUiqE3sktW-WhzrTUEyDS36Q_0qlQL{"v":"KERI10JSON000091_","t":"rct","d":"EECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq","i":"EECGIp5CTCJZlZg-kap5Ma04x_tP_xWG90oKRPTW0Geq","s":"0"}-CABBDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp40BBFHf56jD6v15vWezesWY-RPj2ZiXGC-834wAp5TqeW-6VehAMvyAi9ojCfDr1OSYlAWTpEPY6SPfKFFKGUnbQJ"#;
-    expand(&cesr_stream);
+    inspect(&cesr_stream);
 }

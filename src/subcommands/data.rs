@@ -2,7 +2,7 @@ use clap::Subcommand;
 use std::io::{self, IsTerminal, Read};
 
 use crate::{
-    expand,
+    inspect,
     sign::handle_sign,
     tel::handle_issue,
     verification_status::VerificationStatus,
@@ -31,7 +31,7 @@ pub enum DataCommand {
         message: Option<String>,
     },
     /// Presents CESR data in a human-readable format
-    Expand {
+    Inspect {
         /// JSON-based data with CESR attachments to be transformed into a readable format
         #[arg(short, long)]
         message: Option<String>,
@@ -114,8 +114,8 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
                 }
             }
         }
-        DataCommand::Expand { message } => match message {
-            Some(message) => expand::expand(&message),
+        DataCommand::Inspect { message } => match message {
+            Some(message) => inspect::inspect(&message),
             None => {
                 if io::stdin().is_terminal() {
                     return Err(CliError::OptionOrStdinError("-m".to_string()));
@@ -127,7 +127,7 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
                         description: format!("Failed to read from stdin: {}", e),
                     })
                 })?;
-                expand::expand(&buffer)
+                inspect::inspect(&buffer)
             }
         },
         DataCommand::Issue {

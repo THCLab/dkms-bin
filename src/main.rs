@@ -11,10 +11,10 @@ use subcommands::{
 use utils::working_directory;
 
 mod error;
-mod expand;
 mod export;
 mod help;
 mod init;
+mod inspect;
 mod kel;
 mod keri;
 mod mesagkesto;
