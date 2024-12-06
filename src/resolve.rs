@@ -82,13 +82,26 @@ pub fn handle_oobi(alias: &str, oobi_command: &Option<OobiRoles>) -> Result<Vec<
             let locations = find_locations(&identifier, witnesses.clone())
                 .into_iter()
                 .map(Oobi::Location);
-            let witnesses_oobi = witnesses.clone().into_iter().map(|cid| {
-                Oobi::EndRole(EndRole {
-                    eid: cid.clone(),
-                    role: keri_core::oobi::Role::Witness,
-                    cid: identifier.id().clone(),
+            let witnesses_oobi: Vec<Oobi> = witnesses
+                .iter()
+                .flat_map(|cid| {
+                    let mut oobis = vec![Oobi::EndRole(EndRole {
+                        eid: cid.clone(),
+                        role: keri_core::oobi::Role::Witness,
+                        cid: identifier.id().clone(),
+                    })];
+
+                    if let Some(reg) = identifier.registry_id() {
+                        oobis.push(Oobi::EndRole(EndRole {
+                            cid: reg.clone(),
+                            role: keri_core::oobi::Role::Witness,
+                            eid: cid.clone(),
+                        }));
+                    }
+
+                    oobis
                 })
-            });
+                .collect();
             Ok(locations.into_iter().chain(witnesses_oobi).collect())
         }
     }
