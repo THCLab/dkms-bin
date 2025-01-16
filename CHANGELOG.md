@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2025-01-16
+
+### 🚀 Features
+
+- Rename whoami to info
+- Use url instead of oobis in init command
+- Add invalid signatures state
+- Add identifier export command
+- Add witnesses and watchers to identifier info
+- Remove tel incept command
+- Print export output
+- Add import command
+- Print output of issue
+- Allow to read from stdin for verify cmd
+- Rename expand to inspect
+- Add revoke command
+
+### 🐛 Bug Fixes
+
+- Update short options for data issue
+- Fix identifier info command
+- Handle unknown alias in verify
+- Resolve unknown identifier error in issue
+- Allow import to read from stdin
+- Add import/export cmds desc
+- Notify user when verification fails due to no watchers
+- Fix publishing issuance event
+- Unify payload opts across issue, sign and verify
+- Notify missing oobi in verify command
+- Add verify --message description
+- Improve verify --message description
+- Remove init (from/init)seed_file flags
+- Fix finding oobis problem
+- Clear registry id while init
+- Ask for confirmation when alias already exists
+- Verify issued credential
+
+### ⚙️ Miscellaneous Tasks
+
+- Fix clippy warnings
+- Update keri dependencies
+
+### Build
+
+- Update ci.yml
+- Update ci.yml
+- Update ci.yml
+
 ## [0.4.0] - 2024-11-28
 
 ### 🚀 Features
@@ -39,6 +87,7 @@ All notable changes to this project will be documented in this file.
 
 - Improve documentation in the help for init
 - Bump cesrox version
+- Release 0.4.0 version
 
 ### Ichore
 
