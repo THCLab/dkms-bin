@@ -8,7 +8,7 @@ use keri_controller::{EndRole, IdentifierPrefix, Oobi};
 use keri_core::actor::prelude::SelfAddressingIdentifier;
 
 use crate::{
-    keri::{issue, query_tel},
+    keri::{issue, query_tel, revoke},
     said::{compute_and_update_digest, SaidError},
     utils::{load, load_signer, working_directory},
     CliError,
@@ -63,6 +63,31 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
     } else {
         println!("Wrong json format: {}", data);
     };
+    Ok(())
+}
+
+
+pub fn extract_said(data: &str) -> Result<SelfAddressingIdentifier, CliError> {
+    if let Ok(root) =
+        serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data)
+    {
+        let digest: &str = root
+            .get("d")
+            .and_then(|v| v.as_str())
+            .ok_or(CliError::MissingDigest)?;
+        Ok(digest.parse().map_err(SaidError::InvalidSaid)?)
+    } else {
+        println!("Wrong json format: {}", data);
+        Err(CliError::JsonExpected)
+    }
+}
+
+pub async fn handle_revoke(alias: &str, said: &SelfAddressingIdentifier) -> Result<(), CliError> {
+    let mut id = load(alias)?;
+    let signer = Arc::new(load_signer(alias)?);
+    revoke(&mut id, said, signer).await?;
+    println!("Revoked {}", said);
+
     Ok(())
 }
 

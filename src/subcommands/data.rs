@@ -1,10 +1,11 @@
 use clap::Subcommand;
+use said::SelfAddressingIdentifier;
 use std::io::{self, IsTerminal, Read};
 
 use crate::{
     inspect,
     sign::handle_sign,
-    tel::handle_issue,
+    tel::{extract_said, handle_issue, handle_revoke},
     verification_status::VerificationStatus,
     verify::{handle_verify, VerifyHandleError},
     CliError,
@@ -43,6 +44,17 @@ pub enum DataCommand {
         /// ACDC credential payload in JSON format to be processed
         #[arg(short, long)]
         message: String,
+    },
+    /// Revoke credential
+    Revoke {
+        #[arg(short, long)]
+        alias: String,
+        /// ACDC credential payload in JSON format
+        #[arg(short, long)]
+        credential: Option<String>,
+        /// ACDC SAID
+        #[arg(short, long)]
+        said: Option<SelfAddressingIdentifier>,
     },
 }
 
@@ -134,6 +146,21 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             alias,
             message: credential_json,
         } => handle_issue(&alias, &credential_json).await?,
+        DataCommand::Revoke {
+            alias,
+            credential: credential_json,
+            said,
+        } => {
+            match (credential_json, said) {
+                (None, None) => println!("Credential or its SAID in expected"),
+                (None, Some(said)) => handle_revoke(&alias, &said).await?,
+                (Some(cred), None) => {
+                    let said = extract_said(&cred)?;
+                    handle_revoke(&alias, &said).await? 
+                },
+                (Some(_), Some(_)) => println!("Only one of credential or its SAID is expected"),
+            }
+        }
     }
     Ok(())
 }

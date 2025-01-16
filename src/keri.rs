@@ -286,3 +286,30 @@ pub async fn issue(
 
     Ok(())
 }
+
+
+pub async fn revoke(
+    identifier: &mut Identifier,
+    cred_said: &SelfAddressingIdentifier,
+    km: Arc<Signer>,
+) -> Result<(), KeriError> {
+    let ixn = identifier.revoke(&cred_said)?;
+    let signature = SelfSigningPrefix::new(
+        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        km.sign(&ixn)?,
+    );
+    identifier.finalize_anchor(&ixn, signature).await?;
+
+    identifier.notify_witnesses().await?;
+    let witnesses = identifier
+        .find_state(identifier.id())?
+        .witness_config
+        .witnesses;
+    for witness in witnesses {
+        let _qry = query_mailbox(identifier, km.clone(), &witness).await?;
+    }
+
+    identifier.notify_backers().await?;
+
+    Ok(())
+}
