@@ -230,6 +230,10 @@ async fn incept(
     messagebox: Option<LocationScheme>,
     watcher: Vec<LocationScheme>,
 ) -> Result<Identifier, KeriError> {
+    // Clear old identifier cache if exists
+    let mut query_cache_path = db_path.clone();
+    query_cache_path.push("query_cache");
+    let _ = std::fs::remove_file(&query_cache_path);
     let cont = Arc::new(Controller::new(ControllerConfig {
         db_path,
         ..ControllerConfig::default()

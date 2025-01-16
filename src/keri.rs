@@ -193,8 +193,8 @@ pub async fn query_tel(
     km: Arc<Signer>,
 ) -> Result<(), KeriError> {
     let qry = id.query_tel(
-        IdentifierPrefix::SelfAddressing(registry_id),
-        IdentifierPrefix::SelfAddressing(acdc_d.clone()),
+        IdentifierPrefix::self_addressing(registry_id),
+        IdentifierPrefix::self_addressing(acdc_d.clone()),
     )?;
     let signature = SelfSigningPrefix::new(
         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,

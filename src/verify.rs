@@ -4,10 +4,7 @@ use keri_controller::{
     communication::SendingError, error::ControllerError, identifier::Identifier, IdentifierPrefix,
     LocationScheme, Oobi, TelState,
 };
-use keri_core::{
-    event::sections::seal::EventSeal,
-    processor::validator::{MoreInfoError, VerificationError},
-};
+use keri_core::processor::validator::{MoreInfoError, VerificationError};
 use said::SelfAddressingIdentifier;
 use serde::Deserialize;
 
@@ -141,17 +138,11 @@ pub async fn handle_verify(
                     e.into_iter()
                         .map(|(e, _)| {
                             match &e {
-                                VerificationError::MoreInfo(MoreInfoError::EventNotFound(
-                                    EventSeal {
-                                        prefix,
-                                        sn: _,
-                                        event_digest: _,
-                                    },
-                                )) => {
+                                VerificationError::MoreInfo(MoreInfoError::EventNotFound(seal)) => {
                                     // check if identifier oobi is known
-                                    let oobis = find_oobis(&who_id, prefix);
+                                    let oobis = find_oobis(&who_id, &seal.prefix);
                                     if oobis.is_empty() {
-                                        VerifyHandleError::MissingOobi(prefix.clone())
+                                        VerifyHandleError::MissingOobi(seal.prefix.clone())
                                     } else {
                                         e.into()
                                     }

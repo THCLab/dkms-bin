@@ -68,6 +68,7 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
+        cont.query_cache.clone(),
     ))
 }
 
