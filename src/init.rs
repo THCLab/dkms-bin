@@ -12,7 +12,7 @@ use ed25519_dalek::SigningKey;
 
 use keri_controller::{
     config::ControllerConfig, controller::Controller, identifier::Identifier, BasicPrefix,
-    CesrPrimitive, LocationScheme, SeedPrefix,
+    LocationScheme, SeedPrefix,
 };
 use keri_core::signer::Signer;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ use crate::{
     keri::{setup_identifier, KeriError},
     subcommands::identifier::IdentifierSubcommandError,
     tel::remove_registry,
-    utils::working_directory,
+    utils::{save_identifier, save_next_seed, save_seed, working_directory, LoadingError},
     CliError,
 };
 
@@ -126,6 +126,43 @@ pub async fn handle_init(
     let keys = keys_config.unwrap_or_default();
 
     // Compute kel database path
+    let store_path = kel_database_path(&alias)?; 
+
+    println!("Initializing identifier for alias {:?}...", store_path);
+    let mut db_path = store_path.clone();
+    db_path.push("db");
+
+    let info = format!("No witnesses are configured for {} identifier, so KEL won't be publicly available. To configure witnesses, provide their OOBIs with --witness option", &alias);
+    match &kel_config.witness {
+        Some(wits) if wits.is_empty() => println!("{}", info),
+        None => println!("{}", info),
+        Some(_) => (),
+    };
+
+    let id = handle_new_id(&keys, kel_config, &db_path).await;
+    match id {
+        Ok(id) => {
+            let _ = remove_registry(&alias);
+            // Save next keys seed
+            save_next_seed(&keys.next, &store_path)?;
+            
+            // Save identifier
+            save_identifier(id.id(), &store_path)?;
+            // Save private key
+            save_seed(&keys.current, &store_path)?;
+            
+            print!("\nIdentifier for alias {} initialized: {}", alias, id.id());
+        }
+        Err(e) => {
+            println!("{}", e)
+        }
+    }
+
+    Ok(())
+}
+
+pub fn kel_database_path(alias: &str) -> Result<PathBuf, LoadingError> {
+    // Compute kel database path
     let mut store_path = working_directory()?;
     store_path.push(&alias);
 
@@ -154,48 +191,7 @@ pub async fn handle_init(
         );
         std::process::exit(1);
     }
-
-    println!("Initializing identifier for alias {:?}...", store_path);
-    let mut db_path = store_path.clone();
-    db_path.push("db");
-
-    let info = format!("No witnesses are configured for {} identifier, so KEL won't be publicly available. To configure witnesses, provide their OOBIs with --witness option", &alias);
-    match &kel_config.witness {
-        Some(wits) if wits.is_empty() => println!("{}", info),
-        None => println!("{}", info),
-        Some(_) => (),
-    };
-
-    let id = handle_new_id(&keys, kel_config, &db_path).await;
-    match id {
-        Ok(id) => {
-            let _ = remove_registry(&alias);
-            // Save next keys seed
-            let mut nsk_path = store_path.clone();
-            nsk_path.push("next_priv_key");
-            let mut file = File::create(nsk_path)?;
-            file.write_all(keys.next.to_str().as_bytes())?;
-
-            print!("\nIdentifier for alias {} initialized: {}", alias, id.id());
-
-            // Save identifier
-            let mut id_path = store_path.clone();
-            id_path.push("id");
-            let mut file = File::create(id_path)?;
-            file.write_all(id.id().to_string().as_bytes())?;
-
-            // Save private key
-            let mut priv_key_path = store_path.clone();
-            priv_key_path.push("priv_key");
-            let mut file = File::create(priv_key_path)?;
-            file.write_all(keys.current.to_str().as_bytes())?;
-        }
-        Err(e) => {
-            println!("{}", e)
-        }
-    }
-
-    Ok(())
+    Ok(store_path)
 }
 
 pub(crate) async fn handle_new_id(

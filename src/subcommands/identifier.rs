@@ -9,6 +9,7 @@ use keri_controller::LocationScheme;
 use tabled::{builder::Builder, settings::Style};
 use url::Url;
 
+use crate::export::IdentifierExport;
 use crate::{
     export::{handle_export, handle_import, ExportError},
     init::{handle_init, KeysConfig},
@@ -197,7 +198,10 @@ pub async fn process_identifier_command(
         }
         IdentifierCommand::Import { data, alias } => match data {
             Some(data) => {
-                handle_import(&alias, &data).await?;
+                let imported: IdentifierExport = serde_json::from_str(&data).map_err(|_e| {
+                    IdentifierSubcommandError::ArgumentsError("Invalid JSON".to_string())
+                })?;
+                handle_import(&alias, imported).await?;
                 Ok(())
             }
             None => {
@@ -215,7 +219,10 @@ pub async fn process_identifier_command(
                         e
                     ))
                 })?;
-                handle_import(&alias, &buffer).await?;
+                let imported: IdentifierExport = serde_json::from_str(&buffer).map_err(|_e| {
+                    IdentifierSubcommandError::ArgumentsError("Invalid JSON".to_string())
+                })?;
+                handle_import(&alias, imported).await?;
                 Ok(())
             }
         },

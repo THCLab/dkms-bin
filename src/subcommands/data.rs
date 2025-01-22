@@ -150,17 +150,15 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             alias,
             credential: credential_json,
             said,
-        } => {
-            match (credential_json, said) {
-                (None, None) => println!("Credential or its SAID in expected"),
-                (None, Some(said)) => handle_revoke(&alias, &said).await?,
-                (Some(cred), None) => {
-                    let said = extract_said(&cred)?;
-                    handle_revoke(&alias, &said).await? 
-                },
-                (Some(_), Some(_)) => println!("Only one of credential or its SAID is expected"),
+        } => match (credential_json, said) {
+            (None, None) => println!("Credential or its SAID in expected"),
+            (None, Some(said)) => handle_revoke(&alias, &said).await?,
+            (Some(cred), None) => {
+                let said = extract_said(&cred)?;
+                handle_revoke(&alias, &said).await?
             }
-        }
+            (Some(_), Some(_)) => println!("Only one of credential or its SAID is expected"),
+        },
     }
     Ok(())
 }

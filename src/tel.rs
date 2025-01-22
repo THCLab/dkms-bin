@@ -10,11 +10,11 @@ use keri_core::actor::prelude::SelfAddressingIdentifier;
 use crate::{
     keri::{issue, query_tel, revoke},
     said::{compute_and_update_digest, SaidError},
-    utils::{load, load_signer, working_directory},
+    utils::{load, load_signer, working_directory, LoadingError},
     CliError,
 };
 
-pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), CliError> {
+pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), LoadingError> {
     let mut store_path = working_directory()?;
     store_path.push(alias);
 
@@ -66,11 +66,8 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-
 pub fn extract_said(data: &str) -> Result<SelfAddressingIdentifier, CliError> {
-    if let Ok(root) =
-        serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data)
-    {
+    if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
         let digest: &str = root
             .get("d")
             .and_then(|v| v.as_str())

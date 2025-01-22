@@ -28,6 +28,7 @@ mod temporary_id;
 mod utils;
 mod verification_status;
 mod verify;
+mod debug;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, help_template = help::HELP_TEMPLATE)]
