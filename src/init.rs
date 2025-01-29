@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fmt::Display,
-    fs::{self, File},
+    fs::{self},
     io::Write,
     path::{Path, PathBuf},
     sync::Arc,
@@ -261,7 +261,7 @@ next: AFmIICAHyx5VfLZR2hrpSlTYKFPE58updFl-U96YBhda";
     let dir = tempfile::tempdir().unwrap();
 
     let file_path = dir.path().join("temporary_keys.yaml");
-    let mut file = File::create(file_path.clone()).unwrap();
+    let mut file = std::fs::File::create(file_path.clone()).unwrap();
     writeln!(file, "{}", &keys_yaml).unwrap();
 
     let conf: Result<KeysConfig, _> = Figment::new().merge(Yaml::file(file_path)).extract();

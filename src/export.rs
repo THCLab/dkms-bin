@@ -10,7 +10,7 @@ use keri_core::event::sections::seal::EventSeal;
 use keri_core::oobi::Role;
 use serde::{Deserialize, Serialize};
 
-use crate::debug::generate_temporary_identifier;
+use crate::temporary_identifier::generate_temporary_identifier;
 use crate::tel::save_registry;
 use crate::utils::{save_identifier, save_next_seed, save_seed};
 use crate::{
@@ -104,12 +104,19 @@ pub async fn handle_import(
            .await
            .unwrap();
         // Find KEL
-        let kel = tmp_id.pull_kel(&imported.last_event_seal, witness.clone()).await.unwrap();
-        
-        for msg in kel {
+        let id = imported.last_event_seal.prefix.clone();
+        let sn = imported.last_event_seal.sn;
+        let kel = tmp_id.pull_kel(id.clone(), 0, sn, witness.clone()).await.unwrap();
+        if let Some(kel) = kel {
+            for msg in kel {
             controller.known_events.process(&msg).unwrap();
-        }
+            }
+        } else {
+            println!("Identifier {} KEL not found", &id);
 
+        };
+        
+        
         // Find TEL
         if let Some(registry_id) = &imported.registry_id {
             let tel_resp = tmp_id.pull_tel(registry_id, None, witness).await;
