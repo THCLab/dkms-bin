@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2025-01-29
+
+### 🚀 Features
+
+- Add debug command
+
+### 🐛 Bug Fixes
+
+- Fix import command
+
 ## [0.5.0] - 2025-01-16
 
 ### 🚀 Features
@@ -43,6 +53,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix clippy warnings
 - Update keri dependencies
+- Release 0.5.0 version
 
 ### Build
 
