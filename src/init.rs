@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fmt::Display,
-    fs::{self},
+    fs::{self, remove_dir_all},
     io::Write,
     path::{Path, PathBuf},
     sync::Arc,
@@ -177,6 +177,7 @@ pub fn kel_database_path(alias: &str) -> Result<PathBuf, LoadingError> {
                         "The alias '{}' already exists. Are you sure you want to overwrite it?",
                         alias
                     )) {
+                        remove_dir_all(&store_path)?;
                     } else {
                         std::process::exit(1);
                     }
