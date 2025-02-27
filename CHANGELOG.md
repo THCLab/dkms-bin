@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2025-02-27
+
+### 🐛 Bug Fixes
+
+- Cleanup database before alias overwriting
+
+### ⚙️ Miscellaneous Tasks
+
+- Add command descriptions
+- Cargo fmt
+
 ## [0.6.0] - 2025-01-29
 
 ### 🚀 Features
@@ -11,6 +22,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Fix import command
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.6.0 version
 
 ## [0.5.0] - 2025-01-16
 
