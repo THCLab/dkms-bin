@@ -55,13 +55,13 @@ pub enum TelCommands {
         /// Alias of the identifier making the request
         #[arg(short, long)]
         alias: String,
-        /// Identifier whose TEL is requested 
+        /// Identifier whose TEL is requested
         #[arg(short, long)]
         issuer_id: String,
-		/// Identifier of the Management TEL
+        /// Identifier of the Management TEL
         #[arg(short, long)]
         registry_id: String,
-		/// Identifier of the VC TEL
+        /// Identifier of the VC TEL
         #[arg(short, long)]
         said: String,
     },

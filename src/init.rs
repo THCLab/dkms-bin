@@ -126,7 +126,7 @@ pub async fn handle_init(
     let keys = keys_config.unwrap_or_default();
 
     // Compute kel database path
-    let store_path = kel_database_path(&alias)?; 
+    let store_path = kel_database_path(&alias)?;
 
     println!("Initializing identifier for alias {:?}...", store_path);
     let mut db_path = store_path.clone();
@@ -145,12 +145,12 @@ pub async fn handle_init(
             let _ = remove_registry(&alias);
             // Save next keys seed
             save_next_seed(&keys.next, &store_path)?;
-            
+
             // Save identifier
             save_identifier(id.id(), &store_path)?;
             // Save private key
             save_seed(&keys.current, &store_path)?;
-            
+
             print!("\nIdentifier for alias {} initialized: {}", alias, id.id());
         }
         Err(e) => {

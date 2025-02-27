@@ -1,5 +1,10 @@
-use std::{fs::{self, File}, io::Write, path::{Path, PathBuf}, sync::Arc};
 use keri_controller::CesrPrimitive;
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use keri_controller::{
@@ -92,7 +97,6 @@ pub fn load_identifier(alias: &str) -> Result<IdentifierPrefix, LoadingError> {
     Ok(identifier)
 }
 
-
 pub fn save_identifier(id: &IdentifierPrefix, path: &Path) -> Result<(), std::io::Error> {
     // Save next keys seed
     let mut id_path = path.to_path_buf();
@@ -100,9 +104,7 @@ pub fn save_identifier(id: &IdentifierPrefix, path: &Path) -> Result<(), std::io
     let mut file = File::create(id_path)?;
     file.write_all(id.to_str().as_bytes())?;
     Ok(())
-
 }
-
 
 pub fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
     let mut db_path = working_directory()?;
@@ -127,7 +129,6 @@ pub fn load_seed(alias: &str) -> Result<SeedPrefix, LoadingError> {
         .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))
 }
 
-
 pub fn save_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Error> {
     // Save next keys seed
     let mut sk_path = path.to_path_buf();
@@ -135,9 +136,7 @@ pub fn save_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Error> {
     let mut file = File::create(sk_path)?;
     file.write_all(seed.to_str().as_bytes())?;
     Ok(())
-
 }
-
 
 pub fn load_next_seed(alias: &str) -> Result<SeedPrefix, LoadingError> {
     let mut path = working_directory()?;
@@ -156,7 +155,6 @@ pub fn save_next_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Err
     let mut file = File::create(nsk_path)?;
     file.write_all(seed.to_str().as_bytes())?;
     Ok(())
-
 }
 
 pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {

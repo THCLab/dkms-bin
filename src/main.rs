@@ -1,7 +1,13 @@
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use error::CliError;
 use subcommands::{
-    data::{process_data_command, DataCommand}, debug::{process_debug_command, DebugCommand}, identifier::{process_identifier_command, IdentifierCommand}, key::{process_key_command, KeyCommands}, log::{process_log_command, LogCommand}, mesagkesto::{process_mesagkesto_command, MesagkestoCommands}, said::{process_said_command, SaidCommands}
+    data::{process_data_command, DataCommand},
+    debug::{process_debug_command, DebugCommand},
+    identifier::{process_identifier_command, IdentifierCommand},
+    key::{process_key_command, KeyCommands},
+    log::{process_log_command, LogCommand},
+    mesagkesto::{process_mesagkesto_command, MesagkestoCommands},
+    said::{process_said_command, SaidCommands},
 };
 use utils::working_directory;
 
@@ -19,10 +25,10 @@ mod seed;
 mod sign;
 mod subcommands;
 mod tel;
+mod temporary_identifier;
 mod utils;
 mod verification_status;
 mod verify;
-mod temporary_identifier;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, help_template = help::HELP_TEMPLATE)]
@@ -71,7 +77,7 @@ enum Commands {
     Debug {
         #[command(subcommand)]
         command: DebugCommand,
-    }
+    },
 }
 
 #[tokio::main]
@@ -122,8 +128,8 @@ async fn process_command(command: Commands) -> Result<(), CliError> {
         Commands::Info => {
             let working_directory = working_directory()?;
             println!("Working directory: {}", working_directory.to_str().unwrap());
-        },
-        Commands::Debug {command} => process_debug_command(command).await,
+        }
+        Commands::Debug { command } => process_debug_command(command).await,
     };
     Ok(())
 }

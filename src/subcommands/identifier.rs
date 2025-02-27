@@ -36,9 +36,9 @@ pub enum IdentifierCommand {
         witness_threshold: Option<u64>,
     },
     /// Show the identifier details of a specified alias
-    Info { 
+    Info {
         /// Alias of the identifier to retrieve details about
-        alias: String 
+        alias: String,
     },
     /// List all aliases and their corresponding identifiers
     List,
@@ -48,9 +48,9 @@ pub enum IdentifierCommand {
         command: OobiCommands,
     },
     /// Export identifier data to JSON
-    Export {   
+    Export {
         /// Alias ot the identifier to export
-        alias: String 
+        alias: String,
     },
     /// Import identifier data from JSON
     Import {
@@ -65,7 +65,7 @@ pub enum IdentifierCommand {
 pub enum OobiCommands {
     /// Returns saved OOBIs of provided alias
     Get {
-        /// Identifier whose OOBI is requested
+        /// Alias of th identifier whose OOBI is requested
         #[arg(short, long)]
         alias: String,
         /// Optional argument that specifies the role of the requested OOBI. Possible values are 'witness', 'watcher', 'messagebox'
