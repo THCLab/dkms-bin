@@ -15,6 +15,7 @@ use crate::{
 pub enum DataCommand {
     /// Sign provided data and returns it in CESR format
     Sign {
+        /// Alias of signer identifier
         #[arg(short, long)]
         alias: String,
         /// JSON-based data to be signed
@@ -23,8 +24,10 @@ pub enum DataCommand {
     },
     /// Verifies provided CESR stream
     Verify {
+        /// Alias of the identifier who verifies message
         #[arg(short, long)]
         alias: String,
+        /// OOBI of signing identifier
         #[arg(short, long)]
         oobi: Vec<String>,
         /// JSON-based data with CESR attachments to be verified
@@ -39,6 +42,7 @@ pub enum DataCommand {
     },
     /// Issue credential
     Issue {
+        /// Alias of issuing identifier
         #[arg(short, long)]
         alias: String,
         /// ACDC credential payload in JSON format to be processed
@@ -47,6 +51,7 @@ pub enum DataCommand {
     },
     /// Revoke credential
     Revoke {
+        /// Alias of revoking identifier
         #[arg(short, long)]
         alias: String,
         /// ACDC credential payload in JSON format

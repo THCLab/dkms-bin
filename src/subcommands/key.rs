@@ -18,6 +18,7 @@ pub enum KeyCommands {
         ///     'K' for Ed448 private key.
         #[arg(short, long, requires = "secret_key")]
         code: Option<String>,
+        /// Secret key, encoded in Base64 format.
         #[arg(short, long, requires = "code")]
         secret_key: Option<String>,
     },

@@ -27,8 +27,10 @@ pub enum LogCommand {
 pub enum KelCommands {
     /// Rotate identifiers keys
     Rotate {
+        /// Alias of the identifier to rotate
         #[arg(short, long)]
         alias: String,
+        /// Path to the rotation configuration file in YAML format
         #[arg(short = 'c', long)]
         rotation_config: Option<PathBuf>,
     },
@@ -50,17 +52,22 @@ pub enum KelCommands {
 pub enum TelCommands {
     /// Search Transaction Event Log event
     Query {
+        /// Alias of the identifier making the request
         #[arg(short, long)]
         alias: String,
+        /// Identifier whose TEL is requested 
         #[arg(short, long)]
         issuer_id: String,
+		/// Identifier of the Management TEL
         #[arg(short, long)]
         registry_id: String,
+		/// Identifier of the VC TEL
         #[arg(short, long)]
         said: String,
     },
     /// Returns OOBI of TEL of given alias
     Oobi {
+        /// Alias of identifier whose TEL OOBI is requested
         #[arg(short, long)]
         alias: String,
     },

@@ -67,7 +67,7 @@ enum Commands {
 
     /// Shows information about working environment
     Info,
-    /// 
+    /// Fetches identifier data from witnesses and watchers  
     Debug {
         #[command(subcommand)]
         command: DebugCommand,
