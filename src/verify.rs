@@ -36,6 +36,8 @@ pub enum VerifyHandleError {
     FaultySignatures,
     #[error("No watchers are configured for {0}")]
     NoWatchersConfigured(IdentifierPrefix),
+    #[error("Invalid credential: {0}")]
+    InvalidCredential(String),
 }
 
 impl From<VerificationError> for VerifyHandleError {
@@ -161,11 +163,11 @@ pub async fn handle_verify(
         }
     } else {
         // We expect that message got fields: d, ii, ri.
-        let fields: NecessaryFields = serde_json::from_str(&message).unwrap();
+        let fields: NecessaryFields = serde_json::from_str(&message).map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?;
 
-        let issuer: IdentifierPrefix = fields.issuer_identifier.parse().unwrap();
-        let said: SelfAddressingIdentifier = fields.digest.parse().unwrap();
-        let registry_id: SelfAddressingIdentifier = fields.registry_id.parse().unwrap();
+        let issuer: IdentifierPrefix = fields.issuer_identifier.parse().map_err(|_e| VerifyHandleError::InvalidCredential("Invalid issuer (i) field value".to_string()))?;
+        let said: SelfAddressingIdentifier = fields.digest.parse().map_err(|_e| VerifyHandleError::InvalidCredential("Invalid digest (d) field value".to_string()))?;
+        let registry_id: SelfAddressingIdentifier = fields.registry_id.parse().map_err(|_e| VerifyHandleError::InvalidCredential("Invalid registry identifier (ri) field value".to_string()))?;
         // Try to verify vc
         match who_id.find_vc_state(&said) {
             Ok(Some(state)) => {
