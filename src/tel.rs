@@ -4,12 +4,14 @@ use std::{
     sync::Arc,
 };
 
+use acdc::attributes::InlineAttributes;
 use keri_controller::{EndRole, IdentifierPrefix, Oobi};
 use keri_core::actor::prelude::SelfAddressingIdentifier;
+use said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
 
 use crate::{
     keri::{issue, query_tel, revoke},
-    said::{compute_and_update_digest, SaidError},
+    said::SaidError,
     utils::{load, load_signer, working_directory, LoadingError},
     CliError,
 };
@@ -41,9 +43,11 @@ pub fn remove_registry(alias: &str) -> Result<(), CliError> {
 pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
-    if let Ok(mut root) =
-        serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data)
-    {
+    if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
+        let mut attributes = InlineAttributes::default();
+        for attr in root.iter() {
+            attributes.insert(attr.0.clone(), attr.1.clone());
+        }
         let signer = Arc::new(load_signer(alias)?);
         if id.registry_id().is_none() {
             // incept TEL if not incepted
@@ -51,15 +55,23 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
             let registry_id = id.registry_id().as_ref().unwrap().to_string();
             save_registry(alias, &registry_id)?;
         };
-        insert_issuer_and_registry(id.id(), id.registry_id().unwrap(), &mut root)?;
-        let digest: &str = root
-            .get("d")
-            .and_then(|v| v.as_str())
-            .ok_or(CliError::MissingDigest)?;
-        let said: SelfAddressingIdentifier = digest.parse().map_err(SaidError::InvalidSaid)?;
+        let attestation = acdc::Attestation::new_public_untargeted(
+            &id.id().to_string(),
+            id.registry_id().unwrap().to_string(),
+            "schema".to_string(),
+            attributes,
+        );
+
+        let said = attestation.digest.clone().unwrap();
 
         issue(&mut id, said, signer).await?;
-        println!("{}", serde_json::to_string(&root).unwrap());
+        let attestation_str = String::from_utf8(
+            attestation
+                .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
+                .unwrap(),
+        )
+        .unwrap();
+        println!("{}", attestation_str);
     } else {
         println!("Wrong json format: {}", data);
     };
@@ -86,29 +98,6 @@ pub async fn handle_revoke(alias: &str, said: &SelfAddressingIdentifier) -> Resu
     println!("Revoked {}", said);
 
     Ok(())
-}
-
-fn insert_issuer_and_registry(
-    issuer: &IdentifierPrefix,
-    registry: &IdentifierPrefix,
-    data: &mut indexmap::IndexMap<String, serde_json::Value>,
-) -> Result<(), SaidError> {
-    data.insert_before(
-        0,
-        "i".to_string(),
-        serde_json::Value::String(issuer.to_string()),
-    );
-    data.insert_before(
-        1,
-        "ri".to_string(),
-        serde_json::Value::String(registry.to_string()),
-    );
-    data.insert_before(
-        2,
-        "d".to_string(),
-        serde_json::Value::String("".to_string()),
-    );
-    compute_and_update_digest(data)
 }
 
 pub async fn handle_query(
@@ -149,7 +138,7 @@ pub fn handle_tel_oobi(alias: &str) -> Result<(), CliError> {
             .collect::<Vec<_>>();
 
         println!("{}", serde_json::to_string(&oobis).unwrap());
-    } 
+    }
 
     Ok(())
 }

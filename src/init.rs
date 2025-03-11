@@ -164,7 +164,7 @@ pub async fn handle_init(
 pub fn kel_database_path(alias: &str) -> Result<PathBuf, LoadingError> {
     // Compute kel database path
     let mut store_path = working_directory()?;
-    store_path.push(&alias);
+    store_path.push(alias);
 
     if !store_path.exists() {
         fs::create_dir_all(&store_path)?;

@@ -1,12 +1,12 @@
 use std::{sync::Arc, thread::sleep, time::Duration};
 
+use acdc::Attestation;
 use keri_controller::{
     communication::SendingError, error::ControllerError, identifier::Identifier, IdentifierPrefix,
     LocationScheme, Oobi, TelState,
 };
 use keri_core::processor::validator::{MoreInfoError, VerificationError};
 use said::SelfAddressingIdentifier;
-use serde::Deserialize;
 
 use crate::{
     keri::query_tel,
@@ -124,7 +124,7 @@ pub async fn handle_verify(
     };
     let attachments = cesr.attachments;
     if !attachments.is_empty() {
-        match who_id.verify_from_cesr(&message) {
+        match who_id.verify_from_cesr(message) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
             Err(ControllerError::VerificationError(e)) => {
                 if e.iter().any(|(e, _)| {
@@ -162,12 +162,12 @@ pub async fn handle_verify(
             Err(_e) => todo!(),
         }
     } else {
-        // We expect that message got fields: d, ii, ri.
-        let fields: NecessaryFields = serde_json::from_str(&message).map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?;
+        let att: Attestation = serde_json::from_str(message)
+            .map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?;
+        let issuer: IdentifierPrefix = att.issuer.parse().unwrap();
+        let said = att.digest.unwrap();
+        let registry_id: SelfAddressingIdentifier = att.registry_identifier.parse().unwrap();
 
-        let issuer: IdentifierPrefix = fields.issuer_identifier.parse().map_err(|_e| VerifyHandleError::InvalidCredential("Invalid issuer (i) field value".to_string()))?;
-        let said: SelfAddressingIdentifier = fields.digest.parse().map_err(|_e| VerifyHandleError::InvalidCredential("Invalid digest (d) field value".to_string()))?;
-        let registry_id: SelfAddressingIdentifier = fields.registry_id.parse().map_err(|_e| VerifyHandleError::InvalidCredential("Invalid registry identifier (ri) field value".to_string()))?;
         // Try to verify vc
         match who_id.find_vc_state(&said) {
             Ok(Some(state)) => {
@@ -210,13 +210,13 @@ pub async fn handle_verify(
 }
 
 fn find_oobis(who_id: &Identifier, issuer: &IdentifierPrefix) -> Vec<LocationScheme> {
-    let oobis = match who_id.find_state(&issuer) {
+    let oobis = match who_id.find_state(issuer) {
         Ok(state) => state.witness_config.witnesses,
         Err(_) => vec![],
     };
     find_locations(
         &who_id,
-        oobis.into_iter().map(|i| IdentifierPrefix::Basic(i)),
+        oobis.into_iter().map(IdentifierPrefix::Basic),
     )
 }
 
@@ -227,14 +227,4 @@ fn match_tel_state(ts: Option<TelState>) -> Result<ACDCState, VerifyHandleError>
         Some(TelState::Revoked) => Ok(ACDCState::Revoked),
         None => Ok(ACDCState::NotFound),
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct NecessaryFields {
-    #[serde(rename = "ri")]
-    registry_id: String,
-    #[serde(rename = "d")]
-    digest: String,
-    #[serde(rename = "i")]
-    issuer_identifier: String,
 }

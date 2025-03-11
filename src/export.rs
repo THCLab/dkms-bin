@@ -50,12 +50,12 @@ pub fn handle_export(alias: &str) -> Result<IdentifierExport, ExportError> {
     let watchers = collect_watchers_data(&identifier)?;
     let id = identifier.id();
     let last_event_seal = identifier.get_last_event_seal().unwrap();
-    let registry_id = identifier.registry_id().map(|id| id.clone());
+    let registry_id = identifier.registry_id().cloned();
 
     Ok(IdentifierExport {
         identifier: id.clone(),
         last_event_seal,
-        registry_id: registry_id,
+        registry_id,
         current_seed: current,
         next_seed: next,
         witnesses: witness_locations,
@@ -142,7 +142,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         let end_role = EndRole {
             cid: identifier.id().clone(),
             role: Role::Watcher,
-            eid: (&watcher.eid).clone(),
+            eid: watcher.eid.clone(),
         };
         identifier
             .resolve_oobi(&Oobi::EndRole(end_role))

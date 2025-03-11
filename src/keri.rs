@@ -292,7 +292,7 @@ pub async fn revoke(
     cred_said: &SelfAddressingIdentifier,
     km: Arc<Signer>,
 ) -> Result<(), KeriError> {
-    let ixn = identifier.revoke(&cred_said)?;
+    let ixn = identifier.revoke(cred_said)?;
     let signature = SelfSigningPrefix::new(
         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         km.sign(&ixn)?,
