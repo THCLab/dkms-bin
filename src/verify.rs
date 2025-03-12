@@ -214,10 +214,7 @@ fn find_oobis(who_id: &Identifier, issuer: &IdentifierPrefix) -> Vec<LocationSch
         Ok(state) => state.witness_config.witnesses,
         Err(_) => vec![],
     };
-    find_locations(
-        &who_id,
-        oobis.into_iter().map(IdentifierPrefix::Basic),
-    )
+    find_locations(&who_id, oobis.into_iter().map(IdentifierPrefix::Basic))
 }
 
 fn match_tel_state(ts: Option<TelState>) -> Result<ACDCState, VerifyHandleError> {

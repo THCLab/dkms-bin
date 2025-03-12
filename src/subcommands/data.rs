@@ -49,8 +49,8 @@ pub enum DataCommand {
         #[arg(short, long)]
         message: String,
         /// OCA Bundle identifier
-        #[arg(short = 'b', long)]
-        oca_bundle_said: String,
+        #[arg(short = 'b', long, value_parser = parse_said)]
+        oca_bundle_said: SelfAddressingIdentifier,
     },
     /// Revoke credential
     Revoke {
@@ -64,6 +64,12 @@ pub enum DataCommand {
         #[arg(short, long)]
         said: Option<SelfAddressingIdentifier>,
     },
+}
+
+fn parse_said(input: &str) -> Result<SelfAddressingIdentifier, String> {
+    input.parse::<SelfAddressingIdentifier>().map_err(|_e| {
+        "Invalid OCA Bundle identifier. Should be Self Addressing Identifier".to_string()
+    })
 }
 
 pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> {
@@ -154,7 +160,7 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             alias,
             message: credential_json,
             oca_bundle_said,
-        } => handle_issue(&alias, &credential_json, oca_bundle_said).await?,
+        } => handle_issue(&alias, &credential_json, oca_bundle_said.to_string()).await?,
         DataCommand::Revoke {
             alias,
             credential: credential_json,
