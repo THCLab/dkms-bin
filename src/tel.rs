@@ -40,7 +40,7 @@ pub fn remove_registry(alias: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
+pub async fn handle_issue(alias: &str, data: &str, scheme: String) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
     if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
@@ -58,7 +58,7 @@ pub async fn handle_issue(alias: &str, data: &str) -> Result<(), CliError> {
         let attestation = acdc::Attestation::new_public_untargeted(
             &id.id().to_string(),
             id.registry_id().unwrap().to_string(),
-            "schema".to_string(),
+            scheme,
             attributes,
         );
 

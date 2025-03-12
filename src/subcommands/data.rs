@@ -45,9 +45,12 @@ pub enum DataCommand {
         /// Alias of issuing identifier
         #[arg(short, long)]
         alias: String,
-        /// ACDC credential payload in JSON format to be processed
+        /// Attributes in JSON format used to construct an ACDC
         #[arg(short, long)]
         message: String,
+        /// OCA Bundle identifier
+        #[arg(short = 'b', long)]
+        oca_bundle_said: String,
     },
     /// Revoke credential
     Revoke {
@@ -150,7 +153,8 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
         DataCommand::Issue {
             alias,
             message: credential_json,
-        } => handle_issue(&alias, &credential_json).await?,
+            oca_bundle_said,
+        } => handle_issue(&alias, &credential_json, oca_bundle_said).await?,
         DataCommand::Revoke {
             alias,
             credential: credential_json,
