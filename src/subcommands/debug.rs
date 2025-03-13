@@ -88,7 +88,7 @@ pub async fn process_debug_command(cmd: DebugCommand) {
                         .join("\n");
                     println!("{}", kel_str);
                 }
-                None => println!("Identifier {} not found", identifier),
+                None => println!("Event with serial number {} not found for identifier {}", sn, identifier),
             }
         }
     }
