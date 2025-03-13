@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2025-03-13
+
+### 🚀 Features
+
+- Use acdc crate
+- Set schema in issue command
+- Add said digesting command
+
+### 🐛 Bug Fixes
+
+- Remove unwraps
+- Expect valid said as oca bundle identifier
+- Refine error message in debug command
+
 ## [0.6.1] - 2025-02-27
 
 ### 🐛 Bug Fixes
@@ -12,6 +26,7 @@ All notable changes to this project will be documented in this file.
 
 - Add command descriptions
 - Cargo fmt
+- Release 0.6.1 version
 
 ## [0.6.0] - 2025-01-29
 
