@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2025-03-14
+
+### 🐛 Bug Fixes
+
+- Add -d flag to digesting command
+
 ## [0.7.0] - 2025-03-13
 
 ### 🚀 Features
@@ -15,6 +21,10 @@ All notable changes to this project will be documented in this file.
 - Remove unwraps
 - Expect valid said as oca bundle identifier
 - Refine error message in debug command
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.7.0 version
 
 ## [0.6.1] - 2025-02-27
 
