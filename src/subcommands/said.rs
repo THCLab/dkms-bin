@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::{self, IsTerminal, Read},
-    path::Path,
-};
+use std::io::{self, IsTerminal, Read};
 
 use clap::Subcommand;
 use said::derivation::{HashFunction, HashFunctionCode};
@@ -18,7 +14,8 @@ pub enum SaidCommands {
     },
     /// Computes the SAID of the provided data
     Digesting {
-        /// Input data: filepath or direct text
+        /// Input data
+        #[arg(short, long)]
         data: Option<String>,
     },
 }
@@ -31,9 +28,6 @@ pub async fn process_said_command(command: SaidCommands) -> Result<(), CliError>
         }
         SaidCommands::Digesting { data } => {
             let input = match data {
-                Some(ref path_or_text) if Path::new(path_or_text).extension().is_some() => {
-                    fs::read_to_string(path_or_text).map_err(CliError::FileError)?
-                }
                 Some(text) => text, // Direct input
                 None => {
                     if io::stdin().is_terminal() {
@@ -44,10 +38,14 @@ pub async fn process_said_command(command: SaidCommands) -> Result<(), CliError>
                     }
 
                     let mut buffer = String::new();
-                    io::stdin()
-                        .read_to_string(&mut buffer)
-                        .map_err(|_e| CliError::OptionOrStdinError("-d".to_string()))?;
-                    buffer
+                    match io::stdin()
+                        .read_to_string(&mut buffer) {
+                            Ok(0) => {
+                                std::process::exit(1);
+                            },
+                            Ok(_) => buffer,
+                            Err(_) => return Err(CliError::OptionOrStdinError("-d".to_string())),
+                        }
                 }
             };
 
