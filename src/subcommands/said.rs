@@ -28,7 +28,7 @@ pub async fn process_said_command(command: SaidCommands) -> Result<(), CliError>
         }
         SaidCommands::Digesting { data } => {
             let input = match data {
-                Some(text) => text, // Direct input
+                Some(text) => text.as_bytes().to_vec(), // Direct input
                 None => {
                     if io::stdin().is_terminal() {
                         eprintln!(
@@ -37,20 +37,19 @@ pub async fn process_said_command(command: SaidCommands) -> Result<(), CliError>
                         std::process::exit(1);
                     }
 
-                    let mut buffer = String::new();
-                    match io::stdin()
-                        .read_to_string(&mut buffer) {
-                            Ok(0) => {
-                                std::process::exit(1);
-                            },
-                            Ok(_) => buffer,
-                            Err(_) => return Err(CliError::OptionOrStdinError("-d".to_string())),
+                    let mut buffer = Vec::new();
+                    match io::stdin().read_to_end(&mut buffer) {
+                        Ok(0) => {
+                            std::process::exit(1);
                         }
+                        Ok(_) => buffer,
+                        Err(_) => return Err(CliError::OptionOrStdinError("-d".to_string())),
+                    }
                 }
             };
 
             let code = HashFunctionCode::Blake3_256;
-            let said = HashFunction::from(code).derive(input.as_bytes());
+            let said = HashFunction::from(code).derive(&input);
             println!("{}", said.to_string())
         }
     };
