@@ -2,11 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2025-03-17
+
+### 🐛 Bug Fixes
+
+- Allow binary input digesting command
+
 ## [0.7.1] - 2025-03-14
 
 ### 🐛 Bug Fixes
 
 - Add -d flag to digesting command
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.7.1 version
 
 ## [0.7.0] - 2025-03-13
 
