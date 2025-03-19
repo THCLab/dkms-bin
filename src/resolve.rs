@@ -63,7 +63,10 @@ pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliE
 
 pub fn handle_oobi(alias: &str, oobi_command: &Option<OobiRoles>) -> Result<Vec<Oobi>, CliError> {
     let identifier = load(alias)?;
+    find_oobi(&identifier, oobi_command)
+}
 
+pub fn find_oobi(identifier: &Identifier, oobi_command: &Option<OobiRoles>) -> Result<Vec<Oobi>, CliError> {
     match oobi_command {
         Some(OobiRoles::Witness) => Ok(find_locations(&identifier, witnesses(&identifier)?)
             .into_iter()
@@ -106,6 +109,7 @@ pub fn handle_oobi(alias: &str, oobi_command: &Option<OobiRoles>) -> Result<Vec<
         }
     }
 }
+
 
 pub fn find_locations<I: IntoIterator<Item = IdentifierPrefix>>(
     identifier: &Identifier,

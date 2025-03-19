@@ -1,4 +1,4 @@
-use keri_controller::CesrPrimitive;
+use keri_controller::{mailbox_updating::ActionRequired, CesrPrimitive};
 use std::{
     fs::{self, File},
     io::Write,
@@ -53,9 +53,10 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
     id_path.push("id");
     let mut registry_path = store_path.clone();
     registry_path.push("reg_id");
+    dbg!(&id_path);
 
-    let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
-        .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))?
+    let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone()).unwrap()
+        // .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))
         .parse()
         .map_err(|_e| {
             LoadingError::ParsingError(format!(
@@ -74,7 +75,7 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
-        cont.query_cache.clone(),
+        cont.cache.clone(),
     ))
 }
 
@@ -262,6 +263,86 @@ pub fn parse_json_arguments<T: DeserializeOwned>(
         }
     })?;
     Ok(oobis)
+}
+
+pub fn load_requests() -> Requests {
+    Requests::new()
+}
+
+use redb::{Database, ReadableTable, TableDefinition};
+
+const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("ordered_requests");
+
+pub struct Requests(Database);
+
+impl Requests {
+    pub fn new() -> Self {
+        let mut dir = working_directory().unwrap();
+        dir.push("requests");
+        let db = Database::create(dir).unwrap();
+        let write_txn = db.begin_write().unwrap(); // Start a write transaction
+        {
+            let _table = write_txn.open_table(TABLE).unwrap(); // Open the table (this ensures it exists)
+        }
+        write_txn.commit().unwrap();
+        Self(db)
+    }
+
+    fn get(&self, id: &IdentifierPrefix) -> Vec<ActionRequired> {
+        let read_txn = self.0.begin_read().unwrap();
+        let table = read_txn.open_table(TABLE).unwrap();
+        let current = table.get(id.to_str().as_str())
+            .unwrap();
+        match current {
+            Some(current) => serde_json::from_slice(current.value()).unwrap(),
+            None => vec![],
+        }
+        
+    }
+
+    pub fn add(&mut self, id: &IdentifierPrefix, request: ActionRequired) {
+        let mut current_req = self.get(id);
+        current_req.push(request);
+        self.save(id, current_req).unwrap();
+    }
+
+    pub fn append(&mut self, id: &IdentifierPrefix, requests: Vec<ActionRequired>) {
+        let mut current_req = self.get(id);
+
+        current_req.extend(requests);
+        self.save(id, current_req).unwrap();
+    }
+
+   fn save(&self, id: &IdentifierPrefix, req: Vec<ActionRequired>) -> Result<(), LoadingError> {
+       let write_txn = self.0.begin_write().unwrap();
+        {
+            let mut table = write_txn.open_table(TABLE).unwrap();
+            table.insert(id.to_string().as_str(), serde_json::to_vec(&req).unwrap().as_slice()).unwrap();
+        }
+        write_txn.commit().unwrap();
+        Ok(())
+    }
+
+    pub fn remove(&mut self, id: &IdentifierPrefix, index: usize) {
+        let mut current_req = self.get(id);
+
+        current_req.remove(index);
+        self.save(id, current_req).unwrap();
+
+    }
+
+    pub fn show(&self, id: &IdentifierPrefix) -> String {
+        self.get(id).iter().enumerate().fold(String::new(), |mut acc, (i, r)| {
+            let info = match r {
+                ActionRequired::MultisigRequest(typed_event, _typed_event1) => {
+                    format!("Group event request: {}\n",  serde_json::to_string_pretty(typed_event).unwrap())
+                },
+                ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
+            };
+            acc.push_str(&format!("{}: {}\n", i, info));
+            acc
+        })
+    }
 }
 
 #[test]
