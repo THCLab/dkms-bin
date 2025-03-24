@@ -6,7 +6,7 @@ use keri_core::{event_message::{msg::TypedEvent, timestamped::Timestamped, Event
 use crate::{error::CliError, init::{self, handle_new_id, kel_database_path, KelConfig, KeysConfig}, keri::KeriError, resolve::{find_locations, find_oobi, handle_oobi, witnesses}, utils::{load, load_signer, Requests}};
 
 
-async fn group_incept(
+pub async fn group_incept(
     initiator_id: &mut Identifier,
     initiator_signer: Arc<Signer>,
     members: Vec<IdentifierPrefix>,
@@ -15,7 +15,6 @@ async fn group_incept(
     witness: Vec<LocationScheme>,
     witness_threshold: u64,
 ) -> Result<IdentifierPrefix, KeriError> {
-    // TODO
     // proces witness oobis
 	for witness_oobi in &witness {
 		initiator_id.resolve_oobi(&Oobi::Location(witness_oobi.clone())).await?;
@@ -90,6 +89,22 @@ pub async fn pull_group_mailbox(identifier: &mut Identifier, group_id: &Identifi
         }
     }
     Ok(())
+}
+
+pub async fn requests(identifier: &mut Identifier, signer: Arc<Signer>) -> Requests {
+    let bob_mailbox = pull_mailbox(identifier, signer.clone()).await.unwrap();
+    let mut requests = Requests::new();
+    let bob_group_mailbox = pull_mailbox(identifier, signer).await.unwrap();
+    requests.append(identifier.id(), bob_mailbox);
+    requests.append(identifier.id(), bob_group_mailbox);
+    requests
+}
+
+pub async fn accept(id: &mut Identifier, signer: Arc<Signer>, index: usize) {
+    let mut req = Requests::new();
+    let action = req.remove(id.id(), index);
+    println!("Processing: {:?}", action);
+    process_action(id, signer, action).await;
 }
 
 async fn process_action(identifier: &mut Identifier, signer: Arc<Signer>, action: ActionRequired) {

@@ -115,7 +115,7 @@ async fn find_oobi(url: url::Url) -> Result<LocationScheme, InitError> {
         .await?)
 }
 
-async fn find_oobis_for_urls<I>(urls: I) -> Result<Vec<LocationScheme>, InitError>
+pub async fn find_oobis_for_urls<I>(urls: I) -> Result<Vec<LocationScheme>, InitError>
 where
     I: IntoIterator<Item = Url>,
 {

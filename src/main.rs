@@ -128,7 +128,7 @@ async fn process_command(command: Commands) -> Result<(), CliError> {
                 println!("Working directory: {}", working_directory.to_str().unwrap());
             }
         Commands::Debug { command } => process_debug_command(command).await,
-        Commands::Membership { command } => process_membership_command(command),
+        Commands::Membership { command } => process_membership_command(command).await,
     };
     Ok(())
 }

@@ -323,11 +323,12 @@ impl Requests {
         Ok(())
     }
 
-    pub fn remove(&mut self, id: &IdentifierPrefix, index: usize) {
+    pub fn remove(&mut self, id: &IdentifierPrefix, index: usize) -> ActionRequired{
         let mut current_req = self.get(id);
 
-        current_req.remove(index);
+        let element = current_req.remove(index);
         self.save(id, current_req).unwrap();
+        element
 
     }
 
