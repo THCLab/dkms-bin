@@ -2,11 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2025-03-25
+
+### 🐛 Bug Fixes
+
+- Correct import command behavior
+
 ## [0.7.2] - 2025-03-17
 
 ### 🐛 Bug Fixes
 
 - Allow binary input digesting command
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.7.2 version
 
 ## [0.7.1] - 2025-03-14
 
