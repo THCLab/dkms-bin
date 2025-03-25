@@ -101,7 +101,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         let id = imported.last_event_seal.prefix.clone();
         let sn = imported.last_event_seal.sn;
         let kel = tmp_id
-            .pull_kel(id.clone(), 0, sn, witness.clone())
+            .pull_kel(id.clone(), 0, sn + 1, witness.clone())
             .await
             .unwrap();
         if let Some(kel) = kel {
