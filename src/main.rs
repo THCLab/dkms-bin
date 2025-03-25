@@ -1,7 +1,14 @@
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use error::CliError;
 use subcommands::{
-    data::{process_data_command, DataCommand}, debug::{process_debug_command, DebugCommand}, identifier::{process_identifier_command, IdentifierCommand}, key::{process_key_command, KeyCommands}, log::{process_log_command, LogCommand}, membership::{process_membership_command, MembershipCommand}, mesagkesto::{process_mesagkesto_command, MesagkestoCommands}, said::{process_said_command, SaidCommands}
+    data::{process_data_command, DataCommand},
+    debug::{process_debug_command, DebugCommand},
+    identifier::{process_identifier_command, IdentifierCommand},
+    key::{process_key_command, KeyCommands},
+    log::{process_log_command, LogCommand},
+    membership::{process_membership_command, MembershipCommand},
+    mesagkesto::{process_mesagkesto_command, MesagkestoCommands},
+    said::{process_said_command, SaidCommands},
 };
 use utils::working_directory;
 
@@ -13,6 +20,7 @@ mod inspect;
 mod kel;
 mod keri;
 mod mesagkesto;
+mod multisig;
 mod resolve;
 mod said;
 mod seed;
@@ -23,7 +31,6 @@ mod temporary_identifier;
 mod utils;
 mod verification_status;
 mod verify;
-mod multisig;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, help_template = help::HELP_TEMPLATE)]
@@ -76,7 +83,7 @@ enum Commands {
     Membership {
         #[command(subcommand)]
         command: MembershipCommand,
-    }
+    },
 }
 
 #[tokio::main]
@@ -110,23 +117,23 @@ async fn main() -> Result<(), CliError> {
 async fn process_command(command: Commands) -> Result<(), CliError> {
     match command {
         Commands::Identifier { command } => {
-                        process_identifier_command(command).await?;
-            }
+            process_identifier_command(command).await?;
+        }
         Commands::Log { command } => {
-                process_log_command(command).await?;
-            }
+            process_log_command(command).await?;
+        }
         Commands::Data { command } => {
-                process_data_command(command).await?;
-            }
+            process_data_command(command).await?;
+        }
         Commands::Key { command } => {
-                process_key_command(command).await?;
-            }
+            process_key_command(command).await?;
+        }
         Commands::Mesagkesto { command } => process_mesagkesto_command(command).await?,
         Commands::Said { command } => process_said_command(command).await?,
         Commands::Info => {
-                let working_directory = working_directory()?;
-                println!("Working directory: {}", working_directory.to_str().unwrap());
-            }
+            let working_directory = working_directory()?;
+            println!("Working directory: {}", working_directory.to_str().unwrap());
+        }
         Commands::Debug { command } => process_debug_command(command).await,
         Commands::Membership { command } => process_membership_command(command).await,
     };

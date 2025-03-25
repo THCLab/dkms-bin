@@ -53,9 +53,9 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
     id_path.push("id");
     let mut registry_path = store_path.clone();
     registry_path.push("reg_id");
-    dbg!(&id_path);
 
-    let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone()).unwrap()
+    let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
+        .unwrap()
         // .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))
         .parse()
         .map_err(|_e| {
@@ -291,13 +291,11 @@ impl Requests {
     fn get(&self, id: &IdentifierPrefix) -> Vec<ActionRequired> {
         let read_txn = self.0.begin_read().unwrap();
         let table = read_txn.open_table(TABLE).unwrap();
-        let current = table.get(id.to_str().as_str())
-            .unwrap();
+        let current = table.get(id.to_str().as_str()).unwrap();
         match current {
             Some(current) => serde_json::from_slice(current.value()).unwrap(),
             None => vec![],
         }
-        
     }
 
     pub fn add(&mut self, id: &IdentifierPrefix, request: ActionRequired) {
@@ -313,36 +311,46 @@ impl Requests {
         self.save(id, current_req).unwrap();
     }
 
-   fn save(&self, id: &IdentifierPrefix, req: Vec<ActionRequired>) -> Result<(), LoadingError> {
-       let write_txn = self.0.begin_write().unwrap();
+    fn save(&self, id: &IdentifierPrefix, req: Vec<ActionRequired>) -> Result<(), LoadingError> {
+        let write_txn = self.0.begin_write().unwrap();
         {
             let mut table = write_txn.open_table(TABLE).unwrap();
-            table.insert(id.to_string().as_str(), serde_json::to_vec(&req).unwrap().as_slice()).unwrap();
+            table
+                .insert(
+                    id.to_string().as_str(),
+                    serde_json::to_vec(&req).unwrap().as_slice(),
+                )
+                .unwrap();
         }
         write_txn.commit().unwrap();
         Ok(())
     }
 
-    pub fn remove(&mut self, id: &IdentifierPrefix, index: usize) -> ActionRequired{
+    pub fn remove(&mut self, id: &IdentifierPrefix, index: usize) -> ActionRequired {
         let mut current_req = self.get(id);
 
         let element = current_req.remove(index);
         self.save(id, current_req).unwrap();
         element
-
     }
 
-    pub fn show(&self, id: &IdentifierPrefix) -> String {
-        self.get(id).iter().enumerate().fold(String::new(), |mut acc, (i, r)| {
-            let info = match r {
-                ActionRequired::MultisigRequest(typed_event, _typed_event1) => {
-                    format!("Group event request: {}\n",  serde_json::to_string_pretty(typed_event).unwrap())
-                },
-                ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
-            };
-            acc.push_str(&format!("{}: {}\n", i, info));
-            acc
-        })
+    pub fn show(&self, id: &IdentifierPrefix) -> Vec<String> {
+        self.get(id)
+            .iter()
+            .enumerate()
+            .map(|(i, r)| {
+                let info = match r {
+                    ActionRequired::MultisigRequest(typed_event, _typed_event1) => {
+                        format!(
+                            "Group event request: {}\n",
+                            serde_json::to_string_pretty(typed_event).unwrap()
+                        )
+                    }
+                    ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
+                };
+                format!("{}: {}\n", i, info)
+            })
+            .collect()
     }
 }
 
