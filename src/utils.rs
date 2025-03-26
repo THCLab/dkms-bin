@@ -298,17 +298,12 @@ impl Requests {
         }
     }
 
-    pub fn add(&mut self, id: &IdentifierPrefix, request: ActionRequired) {
+    pub fn add(&mut self, id: &IdentifierPrefix, request: ActionRequired) -> usize {
         let mut current_req = self.get(id);
         current_req.push(request);
+        let index = current_req.len() - 1;
         self.save(id, current_req).unwrap();
-    }
-
-    pub fn append(&mut self, id: &IdentifierPrefix, requests: Vec<ActionRequired>) {
-        let mut current_req = self.get(id);
-
-        current_req.extend(requests);
-        self.save(id, current_req).unwrap();
+        index
     }
 
     fn save(&self, id: &IdentifierPrefix, req: Vec<ActionRequired>) -> Result<(), LoadingError> {
@@ -334,21 +329,25 @@ impl Requests {
         element
     }
 
+    pub fn show_one(request: &ActionRequired) -> String {
+        match request {
+            ActionRequired::MultisigRequest(typed_event, _typed_event1) => {
+                format!(
+                    "Group event request: {}\n",
+                    serde_json::to_string_pretty(typed_event).unwrap()
+                )
+            }
+            ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
+        }
+    }
+
     pub fn show(&self, id: &IdentifierPrefix) -> Vec<String> {
         self.get(id)
             .iter()
             .enumerate()
             .map(|(i, r)| {
-                let info = match r {
-                    ActionRequired::MultisigRequest(typed_event, _typed_event1) => {
-                        format!(
-                            "Group event request: {}\n",
-                            serde_json::to_string_pretty(typed_event).unwrap()
-                        )
-                    }
-                    ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
-                };
-                format!("{}: {}\n", i, info)
+                let req = Self::show_one(r);
+                format!("{}: {}", i, req)
             })
             .collect()
     }

@@ -43,7 +43,6 @@ pub async fn group_incept(
         })
         .collect();
 
-    dbg!(&members);
     // Incept group
     let (group_inception, exn_messages) = initiator_id.incept_group(
         members,
@@ -122,35 +121,18 @@ pub async fn pull_group_mailbox(
     Ok(out)
 }
 
-pub async fn requests(
-    identifier: &mut Identifier,
-    groups: &[IdentifierPrefix],
-    signer: Arc<Signer>,
-) -> Requests {
-    let bob_mailbox = pull_mailbox(identifier, signer.clone()).await.unwrap();
-    let mut requests = Requests::new();
-    for group in groups {
-        let bob_group_mailbox = pull_group_mailbox(identifier, group, signer.clone())
-            .await
-            .unwrap();
-        requests.append(identifier.id(), bob_group_mailbox);
-    }
-    requests.append(identifier.id(), bob_mailbox);
-    requests
-}
-
 pub async fn accept(id: &mut Identifier, signer: Arc<Signer>, index: usize) -> IdentifierPrefix {
     let mut req = Requests::new();
     let action = req.remove(id.id(), index);
-    process_action(id, signer, action).await.unwrap()
+    process_action(id, signer, &action).await.unwrap()
 }
 
 async fn process_action(
     identifier: &mut Identifier,
     signer: Arc<Signer>,
-    action: ActionRequired,
+    action: &ActionRequired,
 ) -> Result<IdentifierPrefix, CliError> {
-    let id = match &action {
+    let id = match action {
         ActionRequired::DelegationRequest(_, _) => {
             todo!()
         }
@@ -175,89 +157,4 @@ async fn process_action(
         }
     };
     Ok(id)
-}
-
-#[tokio::test]
-async fn test_group_incept() {
-    let witness_oobi: LocationScheme = serde_json::from_str(r#"{"eid":"BJq7UABlttINuWJh1Xl2lkqZG4NTdUdqnbFJDa6ZyxCC","scheme":"http","url":"http://172.17.0.1:3232/"}"#).unwrap();
-
-    // Init first identifier
-    let alice_alias = "alice0".to_string();
-    let alice_keys = KeysConfig::default();
-    let alice_signer = Arc::new(Signer::new_with_seed(&alice_keys.current).unwrap());
-    let mut alice_id = {
-        let kel_config = KelConfig {
-            witness: Some(vec![witness_oobi.clone()]),
-            witness_threshold: 1,
-            watcher: None,
-        };
-
-        let store_path = kel_database_path(&alice_alias).unwrap();
-
-        println!("Initializing identifier for alias {:?}...", store_path);
-        let mut db_path = store_path.clone();
-        db_path.push("db");
-
-        handle_new_id(&alice_keys, kel_config, &db_path)
-            .await
-            .unwrap()
-    };
-
-    // Init first identifier
-    let bobs_keys = KeysConfig::default();
-    let bob_alias = "bob0".to_string();
-    let bob_signer = Arc::new(Signer::new_with_seed(&bobs_keys.current).unwrap());
-    let mut bob_id = {
-        let kel_config = KelConfig {
-            witness: Some(vec![witness_oobi.clone()]),
-            witness_threshold: 1,
-            watcher: None,
-        };
-
-        let store_path = kel_database_path(&bob_alias).unwrap();
-
-        println!("Initializing identifier for alias {:?}...", store_path);
-        let mut db_path = store_path.clone();
-        db_path.push("db");
-
-        handle_new_id(&bobs_keys, kel_config, &db_path)
-            .await
-            .unwrap()
-    };
-
-    let oo = find_oobi(&bob_id, &None).unwrap();
-
-    // Provide bob's oobi to alice
-    for oobi in oo {
-        alice_id.resolve_oobi(&oobi).await.unwrap();
-    }
-
-    let group_id = group_incept(
-        &mut alice_id,
-        alice_signer.clone(),
-        vec![bob_id.id().clone()],
-        2,
-        Some(2),
-        vec![witness_oobi],
-        1,
-    )
-    .await
-    .unwrap();
-    println!("Group id: {:?}", group_id);
-    println!("Alice id: {:?}", alice_id.id());
-    println!("Bob id: {:?}", bob_id.id());
-
-    let bob_mailbox = pull_mailbox(&mut bob_id, bob_signer).await.unwrap();
-    let mut requests = Requests::new();
-    requests.append(bob_id.id(), bob_mailbox);
-
-    println!("Bob requests: \n{}", requests.show(bob_id.id()).join("\n"));
-
-    // pull_group_mailbox(&mut alice_id, &group_id, alice_signer.clone()).await.unwrap();
-
-    // alice_id.notify_witnesses().await.unwrap();
-    // pull_group_mailbox(&mut alice_id, &group_id, alice_signer).await.unwrap();
-
-    // let kel = alice_id.find_state(&group_id).unwrap();
-    // dbg!(kel);
 }

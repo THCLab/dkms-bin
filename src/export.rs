@@ -87,7 +87,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         imported.registry_id.clone(),
         controller.known_events.clone(),
         controller.communication.clone(),
-        controller.query_cache.clone(),
+        controller.cache.clone(),
     );
 
     // Pull KEL from witnesses

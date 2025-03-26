@@ -1,6 +1,6 @@
-use std::{str::FromStr, sync::Arc};
-
 use clap::Subcommand;
+use std::{str::FromStr, sync::Arc, thread::sleep, time::Duration};
+use tokio::sync::Mutex;
 
 #[derive(Subcommand)]
 pub enum MembershipCommand {
@@ -53,6 +53,8 @@ pub enum MembershipCommand {
     Pending {
         #[arg(short, long)]
         alias: String,
+        #[arg(long)]
+        pull: bool,
     },
     /// Accept a pending request
     Accept {
@@ -107,8 +109,8 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 .unwrap();
             println!("Removed {} from {}", participant, group_alias);
         }
-        MembershipCommand::Pending { alias } => {
-            let mut id = load(&alias).unwrap();
+        MembershipCommand::Pending { alias, pull } => {
+            let id = load(&alias).unwrap();
             let signer = Arc::new(load_signer(&alias).unwrap());
             let mem = Membership::new(alias.as_str());
             let not_finalized = mem.list_groups_members();
@@ -116,11 +118,13 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 println!("Not finalized groups. You can finalize them with `membership finalize` command:  \n\talias | members\n\t{}\n\t", not_finalized.join("\n\t"));
             }
 
-            let groups = mem.group_ids();
-            let req = requests(&mut id, &groups, signer).await;
+            let req = Requests::new();
             let all_req = req.show(id.id());
             if !all_req.is_empty() {
                 println!("Requests from others. You can accept them with `membership accept` command: \n{}", all_req.join("\n\t"));
+            }
+            if pull {
+                watch_mailbox(id, signer, &mem, req).await
             }
         }
         MembershipCommand::Finalize {
@@ -174,10 +178,10 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 let cont = load_controller(alias.as_str()).unwrap();
                 let state = cont.find_state(&id);
                 match state {
-						Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
-						Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
-						Err(e) => println!("Error: {:?}", e),
-					}
+						    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
+						    Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
+						    Err(e) => println!("Error: {:?}", e),
+					    }
             } else {
                 membership
                     .list_groups()
@@ -188,18 +192,55 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
     }
 }
 
+async fn watch_mailbox(
+    mut identifier: Identifier,
+    signer: Arc<Signer>,
+    mem: &Membership,
+    mut requests: Requests,
+) {
+    let all_req = requests.show(identifier.id());
+    if !all_req.is_empty() {
+        println!(
+            "Requests from others. You can accept them with `membership accept` command: \n{}",
+            all_req.join("\n\t")
+        );
+    }
+    loop {
+        let bob_mailbox = pull_mailbox(&mut identifier, signer.clone()).await.unwrap();
+        for request in bob_mailbox {
+            let req_info = Requests::show_one(&request);
+            let index = requests.add(identifier.id(), request);
+            println!("New request: {}: {}", index, req_info);
+        }
+        for group in mem.group_ids() {
+            let bob_group_mailbox = pull_group_mailbox(&mut identifier, &group, signer.clone())
+                .await
+                .unwrap();
+            for request in bob_group_mailbox {
+                let req_info = Requests::show_one(&request);
+                let index = requests.add(identifier.id(), request);
+                println!("New request: {}: {}", index, req_info);
+            }
+        }
+
+        sleep(Duration::from_secs(3));
+    }
+}
+
 use keri_controller::{
-    identifier::mechanics::MechanicsError, IdentifierPrefix, LocationScheme, Oobi,
+    identifier::{mechanics::MechanicsError, Identifier},
+    IdentifierPrefix, Oobi,
 };
+use keri_core::signer::Signer;
 use redb::{
     Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
 };
 use url::Url;
 
 use crate::{
-    multisig::{accept, group_incept, requests},
+    multisig::{accept, group_incept, pull_group_mailbox, pull_mailbox},
     subcommands::{identifier::find_oobis_for_urls, membership},
-    utils::{load, load_controller, load_signer, working_directory, LoadingError},
+    utils::{load, load_controller, load_signer, working_directory, LoadingError, Requests},
 };
 
 const INITIALIZED: MultimapTableDefinition<&str, &str> =
