@@ -2,11 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0-rc.1] - 2025-03-27
+
+### 🚀 Features
+
+- Add multisig submodule
+- Add membership command
+- Accept incoming group requests
+- Add pull option to pending command
+- Allow signing with group identifier
+
+### 🚜 Refactor
+
+- Reformat and fix comments
+
 ## [0.7.3] - 2025-03-25
 
 ### 🐛 Bug Fixes
 
 - Correct import command behavior
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.7.3 version
 
 ## [0.7.2] - 2025-03-17
 
