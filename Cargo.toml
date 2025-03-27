@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-keri-core = { version = "0.17.0-rc3", features = ["oobi", "mailbox"]}
-keri-controller = { version = "0.17.0-rc3"}
+keri-core = { version = "0.17.0-rc4", features = ["oobi", "mailbox"]}
+keri-controller = {version = "0.17.0-rc4"}
 said = { version = "0.4.0", features = ["macros"]} 
 cesrox = { version = "0.1.6", features = ["cesr-proof"] }
 anyhow = { version = "1.0" }
@@ -30,7 +30,7 @@ serde_yaml = "0.9.30"
 base64 = "0.22.1"
 tabled = "0.16.0"
 futures = "0.3.31"
-teliox = {version = "0.17.0-rc3"}
+teliox = {version = "0.17.0-rc4"}
 tempfile = "3.10.0"
 redb = "2.4.0"
 

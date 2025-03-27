@@ -1,6 +1,5 @@
 use clap::Subcommand;
 use std::{str::FromStr, sync::Arc, thread::sleep, time::Duration};
-use tokio::sync::Mutex;
 
 #[derive(Subcommand)]
 pub enum MembershipCommand {
@@ -51,10 +50,15 @@ pub enum MembershipCommand {
     },
     /// List pending memberships and requests from other identifiers of the given alias
     Pending {
+        /// Alias of identifier to show pending memberships and requests
         #[arg(short, long)]
         alias: String,
+        /// Optional argument that specifies whether to pull the mailbox
         #[arg(long)]
         pull: bool,
+        /// Optional argument that specifies the time in seconds to pull the mailbox. If not provided, the mailbox will be pulled indefinitely.
+        #[arg(long, requires = "pull")]
+        time: Option<u32>,
     },
     /// Accept a pending request
     Accept {
@@ -76,6 +80,27 @@ pub enum MembershipCommand {
         /// Optional argument that specifies the group alias to show details about
         #[arg(short, long)]
         group_alias: Option<String>,
+    },
+    /// Sign a message with the group's identifier
+    Sign {
+        /// Alias of group member that will sign the message
+        #[arg(short, long)]
+        alias: String,
+        /// Alias of group to sign the message with
+        #[arg(short, long)]
+        group_alias: String,
+        /// Message to sign
+        #[arg(short, long)]
+        message: String,
+    },
+    /// Returns the group's identifier OOBI
+    Oobi {
+        /// Alias of group member
+        #[arg(short, long)]
+        alias: String,
+        /// Alias of group
+        #[arg(short, long)]
+        group_alias: String,
     },
 }
 
@@ -109,7 +134,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 .unwrap();
             println!("Removed {} from {}", participant, group_alias);
         }
-        MembershipCommand::Pending { alias, pull } => {
+        MembershipCommand::Pending { alias, pull, time } => {
             let id = load(&alias).unwrap();
             let signer = Arc::new(load_signer(&alias).unwrap());
             let mem = Membership::new(alias.as_str());
@@ -124,7 +149,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 println!("Requests from others. You can accept them with `membership accept` command: \n{}", all_req.join("\n\t"));
             }
             if pull {
-                watch_mailbox(id, signer, &mem, req).await
+                watch_mailbox(id, signer, &mem, req, time).await
             }
         }
         MembershipCommand::Finalize {
@@ -178,15 +203,29 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 let cont = load_controller(alias.as_str()).unwrap();
                 let state = cont.find_state(&id);
                 match state {
-						    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
-						    Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
-						    Err(e) => println!("Error: {:?}", e),
-					    }
+						            Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
+						            Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
+						            Err(e) => println!("Error: {:?}", e),
+					            }
             } else {
                 membership
                     .list_groups()
                     .iter()
                     .for_each(|v| println!("{}", v));
+            }
+        }
+        MembershipCommand::Sign {
+            alias,
+            group_alias,
+            message,
+        } => {
+            let resp = handle_group_sign(alias, &group_alias, &message).unwrap();
+            println!("{}", resp);
+        }
+        MembershipCommand::Oobi { alias, group_alias } => {
+            match handle_group_oobi(&alias, &group_alias) {
+                Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
+                Err(e) => println!("{}", e),
             }
         }
     }
@@ -197,6 +236,7 @@ async fn watch_mailbox(
     signer: Arc<Signer>,
     mem: &Membership,
     mut requests: Requests,
+    time: Option<u32>,
 ) {
     let all_req = requests.show(identifier.id());
     if !all_req.is_empty() {
@@ -205,25 +245,40 @@ async fn watch_mailbox(
             all_req.join("\n\t")
         );
     }
-    loop {
-        let bob_mailbox = pull_mailbox(&mut identifier, signer.clone()).await.unwrap();
-        for request in bob_mailbox {
+    if let Some(time) = time {
+        for _ in 1..time {
+            pull_mailbox_helper(&mut identifier, signer.clone(), mem, &mut requests).await;
+            sleep(Duration::from_secs(1));
+        }
+    } else {
+        loop {
+            pull_mailbox_helper(&mut identifier, signer.clone(), mem, &mut requests).await;
+            sleep(Duration::from_secs(1));
+        }
+    }
+}
+
+async fn pull_mailbox_helper(
+    mut identifier: &mut Identifier,
+    signer: Arc<Signer>,
+    mem: &Membership,
+    requests: &mut Requests,
+) {
+    let bob_mailbox = pull_mailbox(&mut identifier, signer.clone()).await.unwrap();
+    for request in bob_mailbox {
+        let req_info = Requests::show_one(&request);
+        let index = requests.add(identifier.id(), request);
+        println!("New request: {}: {}", index, req_info);
+    }
+    for group in mem.group_ids() {
+        let bob_group_mailbox = pull_group_mailbox(&mut identifier, &group, signer.clone())
+            .await
+            .unwrap();
+        for request in bob_group_mailbox {
             let req_info = Requests::show_one(&request);
             let index = requests.add(identifier.id(), request);
             println!("New request: {}: {}", index, req_info);
         }
-        for group in mem.group_ids() {
-            let bob_group_mailbox = pull_group_mailbox(&mut identifier, &group, signer.clone())
-                .await
-                .unwrap();
-            for request in bob_group_mailbox {
-                let req_info = Requests::show_one(&request);
-                let index = requests.add(identifier.id(), request);
-                println!("New request: {}: {}", index, req_info);
-            }
-        }
-
-        sleep(Duration::from_secs(3));
     }
 }
 
@@ -239,6 +294,8 @@ use url::Url;
 
 use crate::{
     multisig::{accept, group_incept, pull_group_mailbox, pull_mailbox},
+    resolve::handle_group_oobi,
+    sign::handle_group_sign,
     subcommands::{identifier::find_oobis_for_urls, membership},
     utils::{load, load_controller, load_signer, working_directory, LoadingError, Requests},
 };

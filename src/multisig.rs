@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use keri_controller::{
-    identifier::Identifier, mailbox_updating::ActionRequired, EndRole, IdentifierPrefix,
-    LocationScheme, Oobi, SelfSigningPrefix,
+    identifier::Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
+    Oobi, SelfSigningPrefix,
 };
 use keri_core::{
     event_message::{msg::TypedEvent, timestamped::Timestamped, EventTypeTag},
@@ -10,14 +10,7 @@ use keri_core::{
     signer::Signer,
 };
 
-use crate::{
-    error::CliError,
-    init::{self, handle_new_id, kel_database_path, KelConfig, KeysConfig},
-    keri::KeriError,
-    resolve::{find_locations, find_oobi, handle_oobi, witnesses},
-    subcommands::membership::Membership,
-    utils::{load, load_signer, Requests},
-};
+use crate::{error::CliError, keri::KeriError, utils::Requests};
 
 pub async fn group_incept(
     initiator_id: &mut Identifier,

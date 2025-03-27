@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
 use thiserror::Error;
 
-use crate::resolve::find_locations;
+use crate::{resolve::find_locations, subcommands::membership::Membership};
 
 #[derive(Error, Debug)]
 pub enum LoadingError {
@@ -68,6 +68,29 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
         Ok(reg) => reg.parse().ok(),
         Err(_) => None,
     };
+
+    let cont = Arc::new(load_controller(alias)?);
+    Ok(Identifier::new(
+        identifier,
+        registry_id,
+        cont.known_events.clone(),
+        cont.communication.clone(),
+        cont.cache.clone(),
+    ))
+}
+
+pub fn load_group_id(alias: &str, group_alias: &str) -> Result<Identifier, LoadingError> {
+    let mut store_path = working_directory()?;
+    store_path.push(alias);
+    let mut id_path = store_path.clone();
+    id_path.push("id");
+    let mut registry_path = store_path.clone();
+    registry_path.push("reg_id");
+
+    let mem = Membership::new(alias);
+    let identifier = mem.get_identifier(group_alias);
+
+    let registry_id = None;
 
     let cont = Arc::new(load_controller(alias)?);
     Ok(Identifier::new(
@@ -265,11 +288,7 @@ pub fn parse_json_arguments<T: DeserializeOwned>(
     Ok(oobis)
 }
 
-pub fn load_requests() -> Requests {
-    Requests::new()
-}
-
-use redb::{Database, ReadableTable, TableDefinition};
+use redb::{Database, TableDefinition};
 
 const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("ordered_requests");
 
@@ -337,7 +356,7 @@ impl Requests {
                     serde_json::to_string_pretty(typed_event).unwrap()
                 )
             }
-            ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
+            ActionRequired::DelegationRequest(_typed_event, _typed_event1) => todo!(),
         }
     }
 

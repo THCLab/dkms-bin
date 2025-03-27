@@ -5,7 +5,10 @@ use clap::Subcommand;
 use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
 
 use crate::{
-    keri::KeriError, subcommands::identifier::IdentifierSubcommandError, utils::load, CliError,
+    keri::KeriError,
+    subcommands::identifier::IdentifierSubcommandError,
+    utils::{load, load_group_id},
+    CliError,
 };
 
 #[derive(Subcommand)]
@@ -64,6 +67,11 @@ pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliE
 pub fn handle_oobi(alias: &str, oobi_command: &Option<OobiRoles>) -> Result<Vec<Oobi>, CliError> {
     let identifier = load(alias)?;
     find_oobi(&identifier, oobi_command)
+}
+
+pub fn handle_group_oobi(alias: &str, group_alias: &str) -> Result<Vec<Oobi>, CliError> {
+    let identifier = load_group_id(alias, group_alias)?;
+    find_oobi(&identifier, &None)
 }
 
 pub fn find_oobi(
