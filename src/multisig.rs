@@ -1,5 +1,6 @@
-use std::{f64::consts::E, sync::Arc};
+use std::sync::Arc;
 
+use cesrox::primitives::codes::self_signing::SelfSigning;
 use keri_controller::{
     identifier::Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
     Oobi, SelfSigningPrefix,
@@ -9,7 +10,7 @@ use keri_core::{
 };
 use said::SelfAddressingIdentifier;
 
-use crate::{error::CliError, keri::{query_mailbox, KeriError}, utils::Requests};
+use crate::{error::CliError, keri::KeriError, utils::Requests};
 
 pub async fn group_incept(
     initiator_id: &mut Identifier,
@@ -168,39 +169,38 @@ async fn process_action(
 
 
 pub async fn issue_group(
-    identifier: &mut Identifier,
+    group_identifier: &mut Identifier,
+    participant_id: &IdentifierPrefix,
     cred_said: SelfAddressingIdentifier,
     km: Arc<Signer>,
 ) -> Result<(), KeriError> {
-    let (vc_id, ixn) = identifier.issue(cred_said.clone()).unwrap();
+    let (vc_id, ixn) = group_identifier.issue(cred_said.clone()).unwrap();
 
-    let exn = event_generator::exchange(identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
+    let exn = event_generator::exchange(group_identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
     let ixn = ixn.encode()?;
 
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        SelfSigning::Ed25519Sha512,
         km.sign(&ixn)?,
     );
 
     let exn_signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        SelfSigning::Ed25519Sha512,
         km.sign(&exn)?,
     );
-    todo!();
 
-    // assert_eq!(vc_id.to_string(), cred_said.to_string());
-    // identifier.finalize_group_anchor(&ixn, signature, vec![(exn, exn_signature)]).await.unwrap();
+    let participant_key = group_identifier.find_state(participant_id).unwrap().current.public_keys[0].clone();
+    let kc = group_identifier.current_public_keys().unwrap();
+    let index = kc
+        .iter()
+        .position(|pk| pk.eq(&participant_key)).unwrap();
+    let exn_signature = Signature::Transferable(
+        SignerData::LastEstablishment(participant_id.clone()),
+        vec![IndexedSignature::new_both_same(exn_signature, index as u16)],
+    );
 
-    // identifier.notify_witnesses().await?;
-    // let witnesses = identifier
-    //     .find_state(identifier.id())?
-    //     .witness_config
-    //     .witnesses;
-    // for witness in witnesses {
-    //     let _qry = query_mailbox(identifier, km.clone(), &witness).await?;
-    // }
-
-    // identifier.notify_backers().await?;
+    assert_eq!(vc_id.to_string(), cred_said.to_string());
+    group_identifier.finalize_group_event(&ixn, signature, vec![(exn, exn_signature)]).await.unwrap();
 
     Ok(())
 }

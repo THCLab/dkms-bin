@@ -1,6 +1,5 @@
 use crate::{
     keri::KeriError,
-    subcommands::membership::Membership,
     utils::{load, load_group_id, load_signer, LoadingError},
     CliError,
 };

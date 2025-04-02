@@ -248,10 +248,10 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                     }
                 }
         MembershipCommand::Issue { alias, group_alias, message, oca_bundle_said } => {
-                let ewa_id = load(&group_alias).unwrap();
+                let ewa_id = load_identifier(&alias).unwrap();
+                let group_id = load_group_id(&alias, &group_alias).unwrap();
                 let ewa_signer = Arc::new(load_signer(&alias).unwrap());
-                let ewa_mem = Arc::new(Membership::new(&alias));
-                handle_group_issue(ewa_id, ewa_signer, ewa_mem, &group_alias, &message, oca_bundle_said.to_string()).await.unwrap();
+                handle_group_issue(group_id, &ewa_id, ewa_signer, &message, oca_bundle_said.to_string()).await.unwrap();
             },
          MembershipCommand::Registry { alias, group_alias } => {
                 let mut group_id = load_group_id(&alias, &group_alias).unwrap();
@@ -341,7 +341,7 @@ use redb::{
 use url::Url;
 
 use crate::{
-    mesagkesto::handle_pull, multisig::{accept, group_incept, pull_group_mailbox, pull_mailbox}, resolve::handle_group_oobi, sign::handle_group_sign, subcommands::{identifier::find_oobis_for_urls, membership}, tel::{handle_group_issue, handle_group_registry_incept}, utils::{handle_info, load, load_controller, load_group_id, load_identifier, load_signer, working_directory, LoadingError, Requests}
+    multisig::{accept, group_incept, pull_group_mailbox, pull_mailbox}, resolve::handle_group_oobi, sign::handle_group_sign, subcommands::identifier::find_oobis_for_urls, tel::{handle_group_issue, handle_group_registry_incept}, utils::{load, load_controller, load_group_id, load_identifier, load_signer, working_directory, LoadingError, Requests}
 };
 
 use super::data::parse_said;
@@ -435,6 +435,7 @@ impl Membership {
             table.insert(group_alias, registry_id).unwrap();
         }
         write_txn.commit().unwrap();
+        println!("Registry {} saved for {}", registry_id, group_alias);
     }
 
     pub fn get_group_registry(&self, group_alias: &str) -> Option<IdentifierPrefix> {
@@ -479,25 +480,10 @@ impl Membership {
         let table = read_txn.open_table(FINISHED).unwrap();
         let mut out = vec![];
         for r in table.iter().unwrap() {
-            let (key, value) = r.unwrap();
+            let (_key, value) = r.unwrap();
             let id: IdentifierPrefix = value.value().parse().unwrap();
             out.push(id);
         }
         out
     }
-}
-
-#[tokio::test]
-async fn test_issue() {
-    let ewa_alias = "jan";
-    let group_alias = "group0";
-    let ewa_id = load_identifier(&ewa_alias).unwrap();
-    let mut group_id = load_group_id(ewa_alias, group_alias).unwrap();
-
-    let ewa_signer = Arc::new(load_signer(&ewa_alias).unwrap());
-    let ewa_mem = Arc::new(Membership::new(ewa_alias));
-
-    let scheme = "EIgEk-irWY5zkU8E9zq4B1PU_h4l03ZtQmOTUK0Up-1O".to_string();
-    handle_group_issue(group_id, ewa_signer, ewa_mem, group_alias, r#"{"hello":"world"}"#, scheme).await.unwrap();
-
 }
