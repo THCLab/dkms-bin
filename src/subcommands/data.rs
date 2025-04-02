@@ -66,7 +66,7 @@ pub enum DataCommand {
     },
 }
 
-fn parse_said(input: &str) -> Result<SelfAddressingIdentifier, String> {
+pub(crate) fn parse_said(input: &str) -> Result<SelfAddressingIdentifier, String> {
     input.parse::<SelfAddressingIdentifier>().map_err(|_e| {
         "Invalid OCA Bundle identifier. Should be Self Addressing Identifier".to_string()
     })

@@ -115,11 +115,12 @@ pub async fn setup_identifier(
 pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result<(), KeriError> {
     // Init tel
     let (_reg_id, ixn) = id.incept_registry()?;
+    let encoded_ixn = ixn.encode()?;
     let signature = SelfSigningPrefix::new(
         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        signer.sign(&ixn)?,
+        signer.sign(&encoded_ixn)?,
     );
-    id.finalize_anchor(&ixn, signature).await?;
+    id.finalize_anchor(&encoded_ixn, signature).await?;
 
     id.notify_witnesses().await?;
 
@@ -266,6 +267,7 @@ pub async fn issue(
     km: Arc<Signer>,
 ) -> Result<(), KeriError> {
     let (vc_id, ixn) = identifier.issue(cred_said.clone())?;
+    let ixn = ixn.encode()?;
     let signature = SelfSigningPrefix::new(
         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         km.sign(&ixn)?,
@@ -286,6 +288,7 @@ pub async fn issue(
 
     Ok(())
 }
+
 
 pub async fn revoke(
     identifier: &mut Identifier,

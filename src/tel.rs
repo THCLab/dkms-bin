@@ -5,15 +5,12 @@ use std::{
 };
 
 use acdc::attributes::InlineAttributes;
-use keri_controller::{EndRole, IdentifierPrefix, Oobi};
-use keri_core::actor::prelude::SelfAddressingIdentifier;
+use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
+use keri_core::{actor::{event_generator, prelude::SelfAddressingIdentifier}, event_message::signature::{Signature, SignerData}, mailbox::exchange::ForwardTopic, prefix::IndexedSignature, signer::Signer};
 use said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
 
 use crate::{
-    keri::{issue, query_tel, revoke},
-    said::SaidError,
-    utils::{load, load_signer, working_directory, LoadingError},
-    CliError,
+    keri::{issue, query_tel, revoke}, multisig::issue_group, said::SaidError, subcommands::membership::Membership, utils::{load, load_group_id, load_signer, working_directory, LoadingError}, CliError
 };
 
 pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), LoadingError> {
@@ -65,6 +62,78 @@ pub async fn handle_issue(alias: &str, data: &str, scheme: String) -> Result<(),
         let said = attestation.digest.clone().unwrap();
 
         issue(&mut id, said, signer).await?;
+        let attestation_str = String::from_utf8(
+            attestation
+                .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
+                .unwrap(),
+        )
+        .unwrap();
+        println!("{}", attestation_str);
+    } else {
+        println!("Wrong json format: {}", data);
+    };
+    Ok(())
+}
+
+
+pub async fn handle_group_registry_incept(group_id: &mut Identifier, participant_id: &IdentifierPrefix, signer: Arc<Signer>, mem: Arc<Membership>, group_alias: &str) -> Result<(), CliError> {
+    if group_id.registry_id().is_none() {
+        println!("Incepting registry");
+        // incept TEL if not incept
+        let (reg_id, ixn) = group_id.incept_registry().unwrap();
+
+        let exn = event_generator::exchange(group_id.id(), &ixn, ForwardTopic::Multisig).encode().unwrap();
+        let ixn = ixn.encode().unwrap();
+
+        let signature = SelfSigningPrefix::new(
+            cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+            signer.sign(&ixn).unwrap(),
+        );
+
+        let exn_signature = SelfSigningPrefix::new(
+            cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+            signer.sign(&exn).unwrap(),
+        );
+
+        let sig = Signature::Transferable(
+            SignerData::LastEstablishment(participant_id.clone()),
+            vec![IndexedSignature::new_both_same(exn_signature, 0)],
+        );
+
+        group_id.finalize_group_event(&ixn, signature, vec![(exn, sig)]).await.unwrap();
+        
+        mem.save_group_registry(group_alias, &reg_id.to_string());
+
+    };
+    Ok(())
+}
+
+pub async fn handle_group_issue(mut group_id: Identifier, signer: Arc<Signer>, mem: Arc<Membership>, group_alias: &str, data: &str, scheme: String) -> Result<(), CliError> {
+    // let mut group_id = load_group_id(&alias, group_alias)?;
+
+    if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
+        let mut attributes = InlineAttributes::default();
+        for attr in root.iter() {
+            attributes.insert(attr.0.clone(), attr.1.clone());
+        }
+        // let signer = Arc::new(load_signer(alias)?);
+        if group_id.registry_id().is_none() {
+            // incept TEL if not incept
+            crate::keri::incept_registry(&mut group_id, signer.clone()).await.unwrap();
+            let registry_id = group_id.registry_id().as_ref().unwrap().to_string();
+            // let mem = Membership::new(alias);
+            mem.save_group_registry(group_alias, &registry_id);
+        };
+        let attestation = acdc::Attestation::new_public_untargeted(
+            &group_id.id().to_string(),
+            group_id.registry_id().unwrap().to_string(),
+            scheme,
+            attributes,
+        );
+
+        let said = attestation.digest.clone().unwrap();
+
+        issue_group(&mut group_id, said, signer).await.unwrap();
         let attestation_str = String::from_utf8(
             attestation
                 .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)

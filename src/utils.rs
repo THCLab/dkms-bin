@@ -90,7 +90,7 @@ pub fn load_group_id(alias: &str, group_alias: &str) -> Result<Identifier, Loadi
     let mem = Membership::new(alias);
     let identifier = mem.get_identifier(group_alias);
 
-    let registry_id = None;
+    let registry_id = mem.get_group_registry(group_alias);
 
     let cont = Arc::new(load_controller(alias)?);
     Ok(Identifier::new(

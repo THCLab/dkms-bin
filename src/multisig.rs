@@ -1,16 +1,15 @@
-use std::sync::Arc;
+use std::{f64::consts::E, sync::Arc};
 
 use keri_controller::{
     identifier::Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
     Oobi, SelfSigningPrefix,
 };
 use keri_core::{
-    event_message::{msg::TypedEvent, timestamped::Timestamped, EventTypeTag},
-    query::mailbox::MailboxRoute,
-    signer::Signer,
+    actor::event_generator, event_message::{msg::TypedEvent, signature::{Signature, SignerData}, timestamped::Timestamped, EventTypeTag}, mailbox::exchange::ForwardTopic, prefix::IndexedSignature, query::mailbox::MailboxRoute, signer::Signer
 };
+use said::SelfAddressingIdentifier;
 
-use crate::{error::CliError, keri::KeriError, utils::Requests};
+use crate::{error::CliError, keri::{query_mailbox, KeriError}, utils::Requests};
 
 pub async fn group_incept(
     initiator_id: &mut Identifier,
@@ -54,15 +53,22 @@ pub async fn group_incept(
     // Group initiator needs to use `finalize_group_incept` instead of just
     // `finalize_event`, to send multisig request to other group participants.
     // Identifier who get this request from mailbox, can use just `finalize_event`
+    let kc = initiator_id.find_state(initiator_id.id()).unwrap().current;
+    let index = initiator_id.index_in_current_keys(&kc).unwrap();
+    let sig_exn = Signature::Transferable(
+        SignerData::LastEstablishment(initiator_id.id().clone()),
+        vec![IndexedSignature::new_both_same(signature_exn, index as u16)],
+    );
+
     let group_id = initiator_id
-        .finalize_group_incept(
+        .finalize_group_event(
             group_inception.as_bytes(),
             signature_icp,
-            vec![(exn_messages[0].as_bytes().to_vec(), signature_exn)],
+            vec![(exn_messages[0].as_bytes().to_vec(), sig_exn)],
         )
         .await?;
 
-    Ok(group_id)
+    Ok(group_id.unwrap())
 }
 
 pub async fn pull_mailbox(
@@ -114,7 +120,7 @@ pub async fn pull_group_mailbox(
     Ok(out)
 }
 
-pub async fn accept(id: &mut Identifier, signer: Arc<Signer>, index: usize) -> IdentifierPrefix {
+pub async fn accept(id: &mut Identifier, signer: Arc<Signer>, index: usize) -> Option<IdentifierPrefix> {
     let mut req = Requests::new();
     let action = req.remove(id.id(), index);
     process_action(id, signer, &action).await.unwrap()
@@ -124,7 +130,7 @@ async fn process_action(
     identifier: &mut Identifier,
     signer: Arc<Signer>,
     action: &ActionRequired,
-) -> Result<IdentifierPrefix, CliError> {
+) -> Result<Option<IdentifierPrefix>, CliError> {
     let id = match action {
         ActionRequired::DelegationRequest(_, _) => {
             todo!()
@@ -139,15 +145,62 @@ async fn process_action(
             );
             let signature_exn =
                 SelfSigningPrefix::Ed25519Sha512(signer.sign(&exn.encode().unwrap()).unwrap());
+
+            let kc = identifier.find_state(identifier.id()).unwrap().current;
+            let index = identifier.index_in_current_keys(&kc).unwrap();
+            let sig_exn = Signature::Transferable(
+                SignerData::LastEstablishment(identifier.id().clone()),
+                vec![IndexedSignature::new_both_same(signature_exn, index as u16)],
+            );
+
             identifier
-                .finalize_group_incept(
+                .finalize_group_event(
                     &multisig_event.encode().unwrap(),
                     signature_ixn.clone(),
-                    vec![(exn.encode().unwrap(), signature_exn)],
+                    vec![(exn.encode().unwrap(), sig_exn)],
                 )
                 .await
                 .unwrap()
         }
     };
     Ok(id)
+}
+
+
+pub async fn issue_group(
+    identifier: &mut Identifier,
+    cred_said: SelfAddressingIdentifier,
+    km: Arc<Signer>,
+) -> Result<(), KeriError> {
+    let (vc_id, ixn) = identifier.issue(cred_said.clone()).unwrap();
+
+    let exn = event_generator::exchange(identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
+    let ixn = ixn.encode()?;
+
+    let signature = SelfSigningPrefix::new(
+        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        km.sign(&ixn)?,
+    );
+
+    let exn_signature = SelfSigningPrefix::new(
+        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        km.sign(&exn)?,
+    );
+    todo!();
+
+    // assert_eq!(vc_id.to_string(), cred_said.to_string());
+    // identifier.finalize_group_anchor(&ixn, signature, vec![(exn, exn_signature)]).await.unwrap();
+
+    // identifier.notify_witnesses().await?;
+    // let witnesses = identifier
+    //     .find_state(identifier.id())?
+    //     .witness_config
+    //     .witnesses;
+    // for witness in witnesses {
+    //     let _qry = query_mailbox(identifier, km.clone(), &witness).await?;
+    // }
+
+    // identifier.notify_backers().await?;
+
+    Ok(())
 }
