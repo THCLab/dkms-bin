@@ -6,7 +6,18 @@ use keri_controller::{
     Oobi, SelfSigningPrefix,
 };
 use keri_core::{
-    actor::event_generator, event_message::{msg::TypedEvent, signature::{Signature, SignerData}, timestamped::Timestamped, EventTypeTag}, mailbox::exchange::ForwardTopic, prefix::IndexedSignature, query::mailbox::MailboxRoute, signer::Signer
+    actor::event_generator,
+    event::KeyEvent,
+    event_message::{
+        msg::{KeriEvent, TypedEvent},
+        signature::{Signature, SignerData},
+        timestamped::Timestamped,
+        EventTypeTag,
+    },
+    mailbox::exchange::{ExchangeMessage, ForwardTopic},
+    prefix::IndexedSignature,
+    query::mailbox::MailboxRoute,
+    signer::Signer,
 };
 use said::SelfAddressingIdentifier;
 
@@ -121,31 +132,40 @@ pub async fn pull_group_mailbox(
     Ok(out)
 }
 
-pub async fn accept(id: &mut Identifier, signer: Arc<Signer>, index: usize) -> Option<IdentifierPrefix> {
-    let mut req = Requests::new();
-    let action = req.remove(id.id(), index);
-    process_action(id, signer, &action).await.unwrap()
+pub async fn accept(
+    id: &mut Identifier,
+    req: Requests,
+    signer: Arc<Signer>,
+    index: usize,
+) -> Option<IdentifierPrefix> {
+    let action = req.remove(index).unwrap();
+    match action {
+        Some((event, exchanges)) => process_multisig_request(id, signer, event, exchanges)
+            .await
+            .unwrap(),
+        None => None,
+    }
 }
 
-async fn process_action(
+async fn process_multisig_request(
     identifier: &mut Identifier,
     signer: Arc<Signer>,
-    action: &ActionRequired,
+    multisig_event: KeriEvent<KeyEvent>,
+    exchanges: Vec<ExchangeMessage>,
 ) -> Result<Option<IdentifierPrefix>, CliError> {
-    let id = match action {
-        ActionRequired::DelegationRequest(_, _) => {
-            todo!()
-        }
-        ActionRequired::MultisigRequest(multisig_event, exn) => {
-            println!(
-                "Got multisig request: {}",
-                String::from_utf8(multisig_event.encode().unwrap()).unwrap()
-            );
-            let signature_ixn = SelfSigningPrefix::Ed25519Sha512(
-                signer.sign(&multisig_event.encode().unwrap()).unwrap(),
-            );
+    println!(
+        "Got multisig request: {}",
+        String::from_utf8(multisig_event.encode().unwrap()).unwrap()
+    );
+    let signature_ixn =
+        SelfSigningPrefix::Ed25519Sha512(signer.sign(&multisig_event.encode().unwrap()).unwrap());
+
+    let signed_exchanges = exchanges
+        .into_iter()
+        .map(|exn| {
+            let serialized_exn = exn.encode().unwrap();
             let signature_exn =
-                SelfSigningPrefix::Ed25519Sha512(signer.sign(&exn.encode().unwrap()).unwrap());
+                SelfSigningPrefix::Ed25519Sha512(signer.sign(&serialized_exn).unwrap());
 
             let kc = identifier.find_state(identifier.id()).unwrap().current;
             let index = identifier.index_in_current_keys(&kc).unwrap();
@@ -153,20 +173,19 @@ async fn process_action(
                 SignerData::LastEstablishment(identifier.id().clone()),
                 vec![IndexedSignature::new_both_same(signature_exn, index as u16)],
             );
+            (serialized_exn, sig_exn)
+        })
+        .collect();
 
-            identifier
-                .finalize_group_event(
-                    &multisig_event.encode().unwrap(),
-                    signature_ixn.clone(),
-                    vec![(exn.encode().unwrap(), sig_exn)],
-                )
-                .await
-                .unwrap()
-        }
-    };
-    Ok(id)
+    Ok(identifier
+        .finalize_group_event(
+            &multisig_event.encode().unwrap(),
+            signature_ixn.clone(),
+            signed_exchanges,
+        )
+        .await
+        .unwrap())
 }
-
 
 pub async fn issue_group(
     group_identifier: &mut Identifier,
@@ -176,31 +195,32 @@ pub async fn issue_group(
 ) -> Result<(), KeriError> {
     let (vc_id, ixn) = group_identifier.issue(cred_said.clone()).unwrap();
 
-    let exn = event_generator::exchange(group_identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
+    let exn =
+        event_generator::exchange(group_identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
     let ixn = ixn.encode()?;
 
-    let signature = SelfSigningPrefix::new(
-        SelfSigning::Ed25519Sha512,
-        km.sign(&ixn)?,
-    );
+    let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn)?);
 
-    let exn_signature = SelfSigningPrefix::new(
-        SelfSigning::Ed25519Sha512,
-        km.sign(&exn)?,
-    );
+    let exn_signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&exn)?);
 
-    let participant_key = group_identifier.find_state(participant_id).unwrap().current.public_keys[0].clone();
+    let participant_key = group_identifier
+        .find_state(participant_id)
+        .unwrap()
+        .current
+        .public_keys[0]
+        .clone();
     let kc = group_identifier.current_public_keys().unwrap();
-    let index = kc
-        .iter()
-        .position(|pk| pk.eq(&participant_key)).unwrap();
+    let index = kc.iter().position(|pk| pk.eq(&participant_key)).unwrap();
     let exn_signature = Signature::Transferable(
         SignerData::LastEstablishment(participant_id.clone()),
         vec![IndexedSignature::new_both_same(exn_signature, index as u16)],
     );
 
     assert_eq!(vc_id.to_string(), cred_said.to_string());
-    group_identifier.finalize_group_event(&ixn, signature, vec![(exn, exn_signature)]).await.unwrap();
+    group_identifier
+        .finalize_group_event(&ixn, signature, vec![(exn, exn_signature)])
+        .await
+        .unwrap();
 
     Ok(())
 }

@@ -132,147 +132,178 @@ pub enum MembershipCommand {
 pub async fn process_membership_command(cmd: MembershipCommand) {
     match cmd {
         MembershipCommand::Add {
-                            alias,
-                            group_alias,
-                            participant,
-                            oobi,
-                } => {
-                    if let Some(oobi) = oobi {
-                        let id = load(&alias).unwrap();
-                        let oobi: Vec<Oobi> = serde_json::from_str(&oobi).unwrap();
-                        for oobi in oobi {
-                            id.resolve_oobi(&oobi).await.unwrap();
-                        }
-                    }
-                    let membership = Membership::new(&alias);
-                    membership.add_member(&group_alias, &participant).unwrap();
-                    println!("Added {} to {}", participant.to_string(), group_alias);
+            alias,
+            group_alias,
+            participant,
+            oobi,
+        } => {
+            if let Some(oobi) = oobi {
+                let id = load(&alias).unwrap();
+                let oobi: Vec<Oobi> = serde_json::from_str(&oobi).unwrap();
+                for oobi in oobi {
+                    id.resolve_oobi(&oobi).await.unwrap();
                 }
+            }
+            let membership = Membership::new(&alias);
+            membership.add_member(&group_alias, &participant).unwrap();
+            println!("Added {} to {}", participant.to_string(), group_alias);
+        }
         MembershipCommand::Remove {
-                    alias,
-                    group_alias,
-                    participant,
-                } => {
-                    let membership = Membership::new(&alias);
-                    membership
-                        .remove_member(&group_alias, &participant)
-                        .unwrap();
-                    println!("Removed {} from {}", participant, group_alias);
-                }
+            alias,
+            group_alias,
+            participant,
+        } => {
+            let membership = Membership::new(&alias);
+            membership
+                .remove_member(&group_alias, &participant)
+                .unwrap();
+            println!("Removed {} from {}", participant, group_alias);
+        }
         MembershipCommand::Pending { alias, pull, time } => {
-                let mut id = load(&alias).unwrap();
-                let signer = Arc::new(load_signer(&alias).unwrap());
-                let mem = Arc::new(Membership::new(&alias));
-                handle_pending(&mut id, signer, mem, pull, time).await;
-                }
+            let mut id = load(&alias).unwrap();
+            let signer = Arc::new(load_signer(&alias).unwrap());
+            let mem = Arc::new(Membership::new(&alias));
+            let req = Requests::new(&alias).unwrap();
+            handle_pending(&mut id, req, signer, mem, pull, time).await;
+        }
         MembershipCommand::Finalize {
-                    alias,
-                    group_alias,
-                    group_threshold,
-                    witness_url,
-                    witness_threshold,
-                } => {
-                    let mut initiator_id = load(&alias).unwrap();
-                    let signer = Arc::new(load_signer(&alias).unwrap());
-                    let membership = Membership::new(&alias);
-                    let members = membership.get_members(group_alias.as_str());
+            alias,
+            group_alias,
+            group_threshold,
+            witness_url,
+            witness_threshold,
+        } => {
+            let mut initiator_id = load(&alias).unwrap();
+            let signer = Arc::new(load_signer(&alias).unwrap());
+            let membership = Membership::new(&alias);
+            let members = membership.get_members(group_alias.as_str());
 
-                    let witnesses_oobis = find_oobis_for_urls(witness_url).await.unwrap();
-                    let group_id = group_incept(
-                        &mut initiator_id,
-                        signer,
-                        members,
-                        group_threshold,
-                        None,
-                        witnesses_oobis,
-                        witness_threshold.unwrap(),
-                    )
-                    .await
-                    .unwrap();
-                    membership.save_group(&group_alias, &group_id.to_string());
-                    println!(
-                        "Group {} finalized. Requests sent to participants. Group id: {}",
-                        group_alias,
-                        group_id.to_string()
-                    );
-                }
+            let witnesses_oobis = find_oobis_for_urls(witness_url).await.unwrap();
+            let group_id = group_incept(
+                &mut initiator_id,
+                signer,
+                members,
+                group_threshold,
+                None,
+                witnesses_oobis,
+                witness_threshold.unwrap(),
+            )
+            .await
+            .unwrap();
+            membership.save_group(&group_alias, &group_id.to_string());
+            println!(
+                "Group {} finalized. Requests sent to participants. Group id: {}",
+                group_alias,
+                group_id.to_string()
+            );
+        }
         MembershipCommand::Accept {
-                    alias,
-                    index,
-                    group_alias,
-                } => {
-                    let mut id = load(&alias).unwrap();
-                    let signer = Arc::new(load_signer(&alias).unwrap());
-                    let group_id = accept(&mut id, signer, index).await;
-                    match (group_alias, group_id) {
-                        (Some(group_alias), Some(id)) => {
-                            let membership = Membership::new(&alias);
-                            membership.save_group(&group_alias, &id.to_string());
-                        },
-                        _ => (),
-                    };
-
-                }
-        MembershipCommand::Info { alias, group_alias } => {
+            alias,
+            index,
+            group_alias,
+        } => {
+            let mut id = load(&alias).unwrap();
+            let signer = Arc::new(load_signer(&alias).unwrap());
+            let req = Requests::new(&alias).unwrap();
+            let group_id = accept(&mut id, req, signer, index).await;
+            match (group_alias, group_id) {
+                (Some(group_alias), Some(id)) => {
                     let membership = Membership::new(&alias);
+                    membership.save_group(&group_alias, &id.to_string());
+                }
+                _ => (),
+            };
+        }
+        MembershipCommand::Info { alias, group_alias } => {
+            let membership = Membership::new(&alias);
 
-                    if let Some(group_alias) = group_alias {
-                        let id = membership.get_identifier(group_alias.as_str());
-                        println!("Identifier: {:?}", id.to_string());
-                        let cont = load_controller(alias.as_str()).unwrap();
-                        let state = cont.find_state(&id);
-                        match state {
+            if let Some(group_alias) = group_alias {
+                let id = membership.get_identifier(group_alias.as_str());
+                println!("Identifier: {:?}", id.to_string());
+                let cont = load_controller(alias.as_str()).unwrap();
+                let state = cont.find_state(&id);
+                match state {
 						                    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
 						                    Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
 						                    Err(e) => println!("Error: {:?}", e),
 					                    }
-                    } else {
-                        membership
-                            .list_groups()
-                            .iter()
-                            .for_each(|v| println!("{}", v));
-                    }
-                }
+            } else {
+                membership
+                    .list_groups()
+                    .iter()
+                    .for_each(|v| println!("{}", v));
+            }
+        }
         MembershipCommand::Sign {
-                    alias,
-                    group_alias,
-                    message,
-                } => {
-                    let resp = handle_group_sign(alias, &group_alias, &message).unwrap();
-                    println!("{}", resp);
-                }
+            alias,
+            group_alias,
+            message,
+        } => {
+            let resp = handle_group_sign(alias, &group_alias, &message).unwrap();
+            println!("{}", resp);
+        }
         MembershipCommand::Oobi { alias, group_alias } => {
-                    match handle_group_oobi(&alias, &group_alias) {
-                        Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
-                        Err(e) => println!("{}", e),
-                    }
-                }
-        MembershipCommand::Issue { alias, group_alias, message, oca_bundle_said } => {
-                let ewa_id = load_identifier(&alias).unwrap();
-                let group_id = load_group_id(&alias, &group_alias).unwrap();
-                let ewa_signer = Arc::new(load_signer(&alias).unwrap());
-                handle_group_issue(group_id, &ewa_id, ewa_signer, &message, oca_bundle_said.to_string()).await.unwrap();
-            },
-         MembershipCommand::Registry { alias, group_alias } => {
-                let mut group_id = load_group_id(&alias, &group_alias).unwrap();
-                let participant_id = load_identifier(&alias).unwrap();
-                let signer = Arc::new(load_signer(&alias).unwrap());
-                let membership = Arc::new(Membership::new(&alias));
-                handle_group_registry_incept(&mut group_id, &participant_id, signer, membership, &group_alias).await.unwrap();
-        },
+            match handle_group_oobi(&alias, &group_alias) {
+                Ok(lcs) => println!("{}", serde_json::to_string(&lcs).unwrap()),
+                Err(e) => println!("{}", e),
+            }
+        }
+        MembershipCommand::Issue {
+            alias,
+            group_alias,
+            message,
+            oca_bundle_said,
+        } => {
+            let ewa_id = load_identifier(&alias).unwrap();
+            let group_id = load_group_id(&alias, &group_alias).unwrap();
+            let ewa_signer = Arc::new(load_signer(&alias).unwrap());
+            handle_group_issue(
+                group_id,
+                &ewa_id,
+                ewa_signer,
+                &message,
+                oca_bundle_said.to_string(),
+            )
+            .await
+            .unwrap();
+        }
+        MembershipCommand::Registry { alias, group_alias } => {
+            let mut group_id = load_group_id(&alias, &group_alias).unwrap();
+            let participant_id = load_identifier(&alias).unwrap();
+            let signer = Arc::new(load_signer(&alias).unwrap());
+            let membership = Arc::new(Membership::new(&alias));
+            handle_group_registry_incept(
+                &mut group_id,
+                &participant_id,
+                signer,
+                membership,
+                &group_alias,
+            )
+            .await
+            .unwrap();
+        }
     }
 }
 
-pub async fn handle_pending(id: &mut Identifier, signer: Arc<Signer>, mem: Arc<Membership>, pull: bool, time: Option<u32>) {
+pub async fn handle_pending(
+    id: &mut Identifier,
+    req: Requests,
+    signer: Arc<Signer>,
+    mem: Arc<Membership>,
+    pull: bool,
+    time: Option<u32>,
+) {
     let not_finalized = mem.list_groups_members();
     if !not_finalized.is_empty() {
         println!("Not finalized groups. You can finalize them with `membership finalize` command:  \n\talias | members\n\t{}\n\t", not_finalized.join("\n\t"));
     }
 
-    let req = Requests::new();
-    let all_req = req.show(id.id());
+    let all_req = req.show().unwrap();
     if !all_req.is_empty() {
-        println!("Requests from others. You can accept them with `membership accept` command: \n{}", all_req.join("\n\t"));
+        println!(
+            "Requests from others. You can accept them with `membership accept` command: \n{}",
+            all_req.join("\n\t")
+        );
     }
     if pull {
         watch_mailbox(id, signer, &mem, req, time).await
@@ -286,7 +317,7 @@ async fn watch_mailbox(
     mut requests: Requests,
     time: Option<u32>,
 ) {
-    let all_req = requests.show(identifier.id());
+    let all_req = requests.show().unwrap();
     if !all_req.is_empty() {
         println!(
             "Requests from others. You can accept them with `membership accept` command: \n{}",
@@ -314,8 +345,12 @@ async fn pull_mailbox_helper(
 ) {
     let bob_mailbox = pull_mailbox(&mut identifier, signer.clone()).await.unwrap();
     for request in bob_mailbox {
-        let req_info = Requests::show_one(&request);
-        let index = requests.add(identifier.id(), request);
+        let requested_event = match &request {
+            ActionRequired::MultisigRequest(ev, exn) => ev,
+            ActionRequired::DelegationRequest(ev, exn) => todo!(),
+        };
+        let req_info = Requests::show_one(&requested_event);
+        let index = requests.add(request).unwrap();
         println!("New request: {}: {}", index, req_info);
     }
     for group in mem.group_ids() {
@@ -323,8 +358,12 @@ async fn pull_mailbox_helper(
             .await
             .unwrap();
         for request in bob_group_mailbox {
-            let req_info = Requests::show_one(&request);
-            let index = requests.add(identifier.id(), request);
+            let requested_event = match &request {
+                ActionRequired::MultisigRequest(ev, exn) => ev,
+                ActionRequired::DelegationRequest(_ev, exn) => todo!(),
+            };
+            let req_info = Requests::show_one(&requested_event);
+            let index = requests.add(request).unwrap();
             println!("New group request: {}: {}", index, req_info);
         }
     }
@@ -332,6 +371,7 @@ async fn pull_mailbox_helper(
 
 use keri_controller::{
     identifier::{mechanics::MechanicsError, Identifier},
+    mailbox_updating::ActionRequired,
     IdentifierPrefix, Oobi,
 };
 use keri_core::signer::Signer;
@@ -341,7 +381,15 @@ use redb::{
 use url::Url;
 
 use crate::{
-    multisig::{accept, group_incept, pull_group_mailbox, pull_mailbox}, resolve::handle_group_oobi, sign::handle_group_sign, subcommands::identifier::find_oobis_for_urls, tel::{handle_group_issue, handle_group_registry_incept}, utils::{load, load_controller, load_group_id, load_identifier, load_signer, working_directory, LoadingError, Requests}
+    multisig::{accept, group_incept, pull_group_mailbox, pull_mailbox},
+    resolve::handle_group_oobi,
+    sign::handle_group_sign,
+    subcommands::identifier::find_oobis_for_urls,
+    tel::{handle_group_issue, handle_group_registry_incept},
+    utils::{
+        load, load_controller, load_group_id, load_identifier, load_signer, working_directory,
+        LoadingError, Requests,
+    },
 };
 
 use super::data::parse_said;
@@ -350,7 +398,7 @@ use super::data::parse_said;
 const INITIALIZED: MultimapTableDefinition<&str, &str> =
     MultimapTableDefinition::new("initialized");
 
-    /// Group alias -> Group identifier mapping
+/// Group alias -> Group identifier mapping
 const FINISHED: TableDefinition<&str, &str> = TableDefinition::new("finished");
 
 /// Alias -> Registry ID mapping
@@ -365,10 +413,11 @@ impl Membership {
         dir.push("membership");
         let db = Database::create(dir).unwrap();
         let write_txn = db.begin_write().unwrap(); // Start a write transaction
-        {   // Open the table (this ensures it exists)
-            let _table = write_txn.open_multimap_table(INITIALIZED).unwrap(); 
-            let _table = write_txn.open_table(FINISHED).unwrap(); 
-            let _table = write_txn.open_table(REGISTRIES).unwrap(); 
+        {
+            // Open the table (this ensures it exists)
+            let _table = write_txn.open_multimap_table(INITIALIZED).unwrap();
+            let _table = write_txn.open_table(FINISHED).unwrap();
+            let _table = write_txn.open_table(REGISTRIES).unwrap();
         }
         write_txn.commit().unwrap();
         Self(db)
@@ -448,7 +497,6 @@ impl Membership {
                 .map(|reg| reg.value().parse::<IdentifierPrefix>().unwrap())
         }
     }
-
 
     pub fn get_identifier(&self, group_alias: &str) -> IdentifierPrefix {
         let read_txn = self.0.begin_read().unwrap();

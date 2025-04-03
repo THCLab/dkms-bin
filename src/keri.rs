@@ -289,7 +289,6 @@ pub async fn issue(
     Ok(())
 }
 
-
 pub async fn revoke(
     identifier: &mut Identifier,
     cred_said: &SelfAddressingIdentifier,

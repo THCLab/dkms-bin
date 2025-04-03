@@ -6,11 +6,22 @@ use std::{
 
 use acdc::attributes::InlineAttributes;
 use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
-use keri_core::{actor::{event_generator, prelude::SelfAddressingIdentifier}, event_message::signature::{Signature, SignerData}, mailbox::exchange::ForwardTopic, prefix::IndexedSignature, signer::Signer};
+use keri_core::{
+    actor::{event_generator, prelude::SelfAddressingIdentifier},
+    event_message::signature::{Signature, SignerData},
+    mailbox::exchange::ForwardTopic,
+    prefix::IndexedSignature,
+    signer::Signer,
+};
 use said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
 
 use crate::{
-    keri::{issue, query_tel, revoke}, multisig::issue_group, said::SaidError, subcommands::membership::Membership, utils::{load, load_group_id, load_signer, working_directory, LoadingError}, CliError
+    keri::{issue, query_tel, revoke},
+    multisig::issue_group,
+    said::SaidError,
+    subcommands::membership::Membership,
+    utils::{load, load_signer, working_directory, LoadingError},
+    CliError,
 };
 
 pub fn save_registry(alias: &str, registry_id: &str) -> Result<(), LoadingError> {
@@ -75,14 +86,21 @@ pub async fn handle_issue(alias: &str, data: &str, scheme: String) -> Result<(),
     Ok(())
 }
 
-
-pub async fn handle_group_registry_incept(group_id: &mut Identifier, participant_id: &IdentifierPrefix, signer: Arc<Signer>, mem: Arc<Membership>, group_alias: &str) -> Result<(), CliError> {
+pub async fn handle_group_registry_incept(
+    group_id: &mut Identifier,
+    participant_id: &IdentifierPrefix,
+    signer: Arc<Signer>,
+    mem: Arc<Membership>,
+    group_alias: &str,
+) -> Result<(), CliError> {
     if group_id.registry_id().is_none() {
         println!("Incepting registry");
         // incept TEL if not incept
         let (reg_id, ixn) = group_id.incept_registry().unwrap();
 
-        let exn = event_generator::exchange(group_id.id(), &ixn, ForwardTopic::Multisig).encode().unwrap();
+        let exn = event_generator::exchange(group_id.id(), &ixn, ForwardTopic::Multisig)
+            .encode()
+            .unwrap();
         let ixn = ixn.encode().unwrap();
 
         let signature = SelfSigningPrefix::new(
@@ -95,26 +113,28 @@ pub async fn handle_group_registry_incept(group_id: &mut Identifier, participant
             signer.sign(&exn).unwrap(),
         );
 
-        let participant_key = group_id.find_state(participant_id).unwrap().current.public_keys[0].clone();
-        let kc = group_id.find_state(group_id.id()).unwrap().current;
-        let index = kc
-            .public_keys
-            .iter()
-            .position(|pk| pk.eq(&participant_key)).unwrap();
-        let sig = Signature::Transferable(
+        let exn_sig = Signature::Transferable(
             SignerData::LastEstablishment(participant_id.clone()),
-            vec![IndexedSignature::new_both_same(exn_signature, index as u16)],
+            vec![IndexedSignature::new_both_same(exn_signature, 0)],
         );
 
-        group_id.finalize_group_event(&ixn, signature, vec![(exn, sig)]).await.unwrap();
-        
-        mem.save_group_registry(group_alias, &reg_id.to_string());
+        group_id
+            .finalize_group_event(&ixn, signature, vec![(exn, exn_sig)])
+            .await
+            .unwrap();
 
+        mem.save_group_registry(group_alias, &reg_id.to_string());
     };
     Ok(())
 }
 
-pub async fn handle_group_issue(mut group_id: Identifier, participant_id: &IdentifierPrefix, signer: Arc<Signer>, data: &str, scheme: String) -> Result<(), CliError> {
+pub async fn handle_group_issue(
+    mut group_id: Identifier,
+    participant_id: &IdentifierPrefix,
+    signer: Arc<Signer>,
+    data: &str,
+    scheme: String,
+) -> Result<(), CliError> {
     if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
         let mut attributes = InlineAttributes::default();
         for attr in root.iter() {
@@ -133,7 +153,9 @@ pub async fn handle_group_issue(mut group_id: Identifier, participant_id: &Ident
 
         let said = attestation.digest.clone().unwrap();
 
-        issue_group(&mut group_id, participant_id, said, signer).await.unwrap();
+        issue_group(&mut group_id, participant_id, said, signer)
+            .await
+            .unwrap();
         let attestation_str = String::from_utf8(
             attestation
                 .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)

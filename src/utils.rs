@@ -13,7 +13,12 @@ use keri_controller::{
     identifier::{mechanics::MechanicsError, Identifier},
     IdentifierPrefix, LocationScheme, SeedPrefix,
 };
-use keri_core::signer::Signer;
+use keri_core::{
+    event::KeyEvent,
+    event_message::msg::KeriEvent,
+    mailbox::exchange::{Exchange, ExchangeMessage},
+    signer::Signer,
+};
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
 use thiserror::Error;
@@ -285,88 +290,201 @@ pub fn parse_json_arguments<T: DeserializeOwned>(
     Ok(oobis)
 }
 
-use redb::{Database, TableDefinition};
+use redb::{
+    Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
+};
 
-const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("ordered_requests");
+/// Index -> digest of event mapping
+const INDEX: TableDefinition<u8, &str> = TableDefinition::new("ordered_requests");
+/// digest of event -> event mapping
+const EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new("events");
+/// digest of event -> exchange mapping
+const EXCHANGES: MultimapTableDefinition<&str, &[u8]> = MultimapTableDefinition::new("exchanges");
 
-pub struct Requests(Database);
+#[derive(Debug, Error)]
+pub enum RequestError {
+    #[error("Database error: {0}")]
+    Database(#[from] redb::DatabaseError),
+    #[error("Transaction error: {0}")]
+    Transaction(#[from] redb::TransactionError),
+    #[error("Table error: {0}")]
+    Table(#[from] redb::TableError),
+    #[error("Transaction error: {0}")]
+    Commit(#[from] redb::CommitError),
+    #[error("Storafe error: {0}")]
+    Storage(#[from] redb::StorageError),
+    #[error("IO error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error(transparent)]
+    Loading(#[from] LoadingError),
+}
+
+pub struct Requests {
+    db: Database,
+    index: u8,
+}
 
 impl Requests {
-    pub fn new() -> Self {
-        let mut dir = working_directory().unwrap();
+    pub fn new(alias: &str) -> Result<Self, RequestError> {
+        let mut dir = working_directory()?;
+        dir.push(alias);
+        fs::create_dir_all(&dir)?;
         dir.push("requests");
         let db = Database::create(dir).unwrap();
-        let write_txn = db.begin_write().unwrap(); // Start a write transaction
-        {
-            let _table = write_txn.open_table(TABLE).unwrap(); // Open the table (this ensures it exists)
-        }
-        write_txn.commit().unwrap();
-        Self(db)
+        let write_txn = db.begin_write()?; // Start a write transaction
+        let length = {
+            // Open the table (this ensures it exists)
+            let table = write_txn.open_table(INDEX)?;
+            let _table = write_txn.open_table(EVENTS)?;
+            let _table = write_txn.open_multimap_table(EXCHANGES)?;
+            table.iter()?.count()
+        };
+        write_txn.commit()?;
+        Ok(Self {
+            db,
+            index: length as u8,
+        })
     }
 
-    fn get(&self, id: &IdentifierPrefix) -> Vec<ActionRequired> {
-        let read_txn = self.0.begin_read().unwrap();
-        let table = read_txn.open_table(TABLE).unwrap();
-        let current = table.get(id.to_str().as_str()).unwrap();
-        match current {
-            Some(current) => serde_json::from_slice(current.value()).unwrap(),
-            None => vec![],
-        }
-    }
-
-    pub fn add(&mut self, id: &IdentifierPrefix, request: ActionRequired) -> usize {
-        let mut current_req = self.get(id);
-        current_req.push(request);
-        let index = current_req.len() - 1;
-        self.save(id, current_req).unwrap();
-        index
-    }
-
-    fn save(&self, id: &IdentifierPrefix, req: Vec<ActionRequired>) -> Result<(), LoadingError> {
-        let write_txn = self.0.begin_write().unwrap();
-        {
-            let mut table = write_txn.open_table(TABLE).unwrap();
-            table
-                .insert(
-                    id.to_string().as_str(),
-                    serde_json::to_vec(&req).unwrap().as_slice(),
-                )
-                .unwrap();
-        }
-        write_txn.commit().unwrap();
-        Ok(())
-    }
-
-    pub fn remove(&mut self, id: &IdentifierPrefix, index: usize) -> ActionRequired {
-        let mut current_req = self.get(id);
-
-        let element = current_req.remove(index);
-        self.save(id, current_req).unwrap();
-        element
-    }
-
-    pub fn show_one(request: &ActionRequired) -> String {
-        match request {
-            ActionRequired::MultisigRequest(typed_event, _typed_event1) => {
-                format!(
-                    "Group event request: {}\n",
-                    serde_json::to_string_pretty(typed_event).unwrap()
-                )
+    fn get(
+        &self,
+        index: usize,
+    ) -> Result<Option<(KeriEvent<KeyEvent>, Vec<KeriEvent<Exchange>>)>, RequestError> {
+        let read_txn = self.db.begin_read()?;
+        let index_table = read_txn.open_table(INDEX)?;
+        let table = read_txn.open_table(EVENTS)?;
+        let exn_table = read_txn.open_multimap_table(EXCHANGES)?;
+        match index_table.get(index as u8)? {
+            None => Ok(None),
+            Some(value) => {
+                let said = value.value();
+                // println!("Getting index: {}, {}", index, said);
+                let event = table.get(said)?.unwrap();
+                let parsed_event = serde_json::from_slice(event.value()).unwrap();
+                let exn = exn_table.get(said)?.map(|value| {
+                    serde_json::from_slice::<KeriEvent<Exchange>>(value.unwrap().value()).unwrap()
+                });
+                Ok(Some((parsed_event, exn.collect())))
             }
-            ActionRequired::DelegationRequest(_typed_event, _typed_event1) => todo!(),
         }
     }
 
-    pub fn show(&self, id: &IdentifierPrefix) -> Vec<String> {
-        self.get(id)
-            .iter()
-            .enumerate()
-            .map(|(i, r)| {
-                let req = Self::show_one(r);
-                format!("{}: {}", i, req)
+    pub fn remove(
+        &self,
+        index: usize,
+    ) -> Result<Option<(KeriEvent<KeyEvent>, Vec<ExchangeMessage>)>, RequestError> {
+        let write_txn = self.db.begin_write()?;
+        let out = {
+            let mut index_table = write_txn.open_table(INDEX)?;
+            let mut table = write_txn.open_table(EVENTS)?;
+            let mut exn_table = write_txn.open_multimap_table(EXCHANGES)?;
+            let said = index_table.remove(index as u8)?;
+            match said {
+                Some(value) => {
+                    let said = value.value();
+                    // println!("Removing index: {}, {}", index, said);
+                    let event = table.remove(said)?.unwrap();
+                    let parsed_event = serde_json::from_slice(event.value()).unwrap();
+                    let exn = exn_table.remove_all(said)?;
+                    let exn = exn.into_iter().map(|value| {
+                        serde_json::from_slice::<ExchangeMessage>(value.unwrap().value()).unwrap()
+                    });
+                    Some((parsed_event, exn.collect()))
+                }
+                _ => None,
+            }
+        };
+        write_txn.commit().unwrap();
+        Ok(out)
+    }
+
+    fn get_all(
+        &self,
+    ) -> Result<Vec<(KeriEvent<KeyEvent>, Vec<KeriEvent<Exchange>>)>, RequestError> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(EVENTS)?;
+        let exn_table = read_txn.open_multimap_table(EXCHANGES)?;
+        table
+            .iter()?
+            .map(|value| -> Result<_, RequestError> {
+                let (key, value) = value?;
+                let event = serde_json::from_slice(value.value()).unwrap();
+                let exn = exn_table.get(key.value())?.map(|value| {
+                    serde_json::from_slice::<KeriEvent<Exchange>>(value.unwrap().value()).unwrap()
+                });
+                Ok((event, exn.collect()))
             })
             .collect()
     }
+
+    pub fn add(&mut self, request: ActionRequired) -> Result<u8, RequestError> {
+        match request {
+            ActionRequired::MultisigRequest(typed_event, exchange) => {
+                let said = typed_event.digest().unwrap();
+                let write_txn = self.db.begin_write()?;
+                {
+                    let mut table = write_txn.open_table(INDEX)?;
+                    table.insert(self.index, said.to_str().as_str())?;
+                    self.index += 1;
+                    let mut table = write_txn.open_table(EVENTS)?;
+                    table.insert(
+                        said.to_str().as_str(),
+                        serde_json::to_vec(&typed_event).unwrap().as_slice(),
+                    )?;
+                    let mut table = write_txn.open_multimap_table(EXCHANGES)?;
+                    table.insert(
+                        said.to_str().as_str(),
+                        serde_json::to_vec(&exchange).unwrap().as_slice(),
+                    )?;
+                }
+                write_txn.commit()?;
+            }
+            ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
+        };
+        Ok((self.index - 1))
+    }
+
+    pub fn show_one(event: &KeriEvent<KeyEvent>) -> String {
+        format!(
+            "Group event request: {}\n",
+            serde_json::to_string_pretty(event).unwrap()
+        )
+    }
+
+    pub fn show(&self) -> Result<Vec<String>, RequestError> {
+        Ok(self
+            .get_all()?
+            .iter()
+            .enumerate()
+            .map(|(i, r)| {
+                let req = Self::show_one(&r.0);
+                format!("{}: {}", i, req)
+            })
+            .collect())
+    }
+}
+
+#[test]
+pub fn test_request() {
+    let mut requests = Requests::new("jan").unwrap();
+    let ixn_str = r#"{"v":"KERI10JSON00013a_","t":"ixn","d":"EDzY9RJvCJLXJgINV_3uaidwGbuyO7gE-hm43xwcoCXE","i":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","s":"1","p":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","a":[{"i":"EJpoowS13EvkmOtd5GIdAIsl1_UCRkpKcl2H6jZrPXD5","s":"0","d":"EEwtVvcjb5IUpIa0Y9FcUkDHejlJY33AWGK6t7o2cJta"}]}"#;
+    let ixn2_str = r#"{"v":"KERI10JSON0001b7_","t":"icp","d":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","i":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","s":"0","kt":"2","k":["DPG-1NOsMNeXHEHCAqdppDQ-hpZWhb-St6G3NwtOToyM","DBgiQ1yzgMbSIlx0QOchX1-xmLAnu_maqj_DS0w24rbr"],"nt":"2","n":["EOShuVKGAYDKrC3ow0-FrgMtnkmNg7eGn7DA3_JdFHS7","EN5eVuMTfsE7bBCGl3Bu8HB2tFxYBERYSA6aBS7gXKZr"],"bt":"1","b":["BJq7UABlttINuWJh1Xl2lkqZG4NTdUdqnbFJDa6ZyxCC"],"c":[],"a":[]}"#;
+    let exn_str = r#"{"v":"KERI10JSON000216_","t":"exn","d":"EH9tygSwyqthvsRY_UEvHX7JeBewi9jPQbz-n42cToOP","dt":"2025-04-03T12:07:42.322364+00:00","r":"/fwd","q":{"pre":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","topic":"multisig"},"a":{"v":"KERI10JSON00013a_","t":"ixn","d":"EDzY9RJvCJLXJgINV_3uaidwGbuyO7gE-hm43xwcoCXE","i":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","s":"1","p":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","a":[{"i":"EJpoowS13EvkmOtd5GIdAIsl1_UCRkpKcl2H6jZrPXD5","s":"0","d":"EEwtVvcjb5IUpIa0Y9FcUkDHejlJY33AWGK6t7o2cJta"}]}}"#;
+    let event = serde_json::from_str::<KeriEvent<KeyEvent>>(ixn_str).unwrap();
+    let event2 = serde_json::from_str::<KeriEvent<KeyEvent>>(ixn2_str).unwrap();
+    let exchange = serde_json::from_str::<ExchangeMessage>(exn_str).unwrap();
+    requests
+        .add(ActionRequired::MultisigRequest(event, exchange.clone()))
+        .unwrap();
+    requests
+        .add(ActionRequired::MultisigRequest(event2, exchange))
+        .unwrap();
+    let result = requests.get(0).unwrap();
+    let result2 = requests.get(0).unwrap();
+    assert_eq!(result, result2);
+    requests.remove(0).unwrap();
+    assert!(requests.get(0).unwrap().is_none());
+    assert!(result.is_some());
 }
 
 #[test]
