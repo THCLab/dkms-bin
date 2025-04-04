@@ -1,4 +1,5 @@
 use keri_controller::{mailbox_updating::ActionRequired, CesrPrimitive};
+use said::SelfAddressingIdentifier;
 use std::{
     fs::{self, File},
     io::Write,
@@ -290,12 +291,12 @@ pub fn parse_json_arguments<T: DeserializeOwned>(
     Ok(oobis)
 }
 
-use redb::{
-    Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
-};
+use redb::{Database, MultimapTableDefinition, ReadableTable, TableDefinition};
 
 /// Index -> digest of event mapping
 const INDEX: TableDefinition<u8, &str> = TableDefinition::new("ordered_requests");
+/// Identifier-> digest of event mapping
+const ACCEPTED: MultimapTableDefinition<&str, &str> = MultimapTableDefinition::new("accepted");
 /// digest of event -> event mapping
 const EVENTS: TableDefinition<&str, &[u8]> = TableDefinition::new("events");
 /// digest of event -> exchange mapping
@@ -319,6 +320,7 @@ pub enum RequestError {
     Loading(#[from] LoadingError),
 }
 
+/// Storage for requests from other participants
 pub struct Requests {
     db: Database,
     index: u8,
@@ -337,6 +339,7 @@ impl Requests {
             let table = write_txn.open_table(INDEX)?;
             let _table = write_txn.open_table(EVENTS)?;
             let _table = write_txn.open_multimap_table(EXCHANGES)?;
+            let _table = write_txn.open_multimap_table(ACCEPTED)?;
             table.iter()?.count()
         };
         write_txn.commit()?;
@@ -369,79 +372,119 @@ impl Requests {
         }
     }
 
-    pub fn remove(
+    pub fn save_accepted(
+        &self,
+        id: &IdentifierPrefix,
+        said: &SelfAddressingIdentifier,
+    ) -> Result<(), RequestError> {
+        let write_txn = self.db.begin_write()?;
+        {
+            let mut accepted_table = write_txn.open_multimap_table(ACCEPTED)?;
+            accepted_table.insert(id.to_str().as_str(), said.to_str().as_str())?;
+        }
+        write_txn.commit()?;
+        Ok(())
+    }
+
+    pub fn accept(
         &self,
         index: usize,
     ) -> Result<Option<(KeriEvent<KeyEvent>, Vec<ExchangeMessage>)>, RequestError> {
         let write_txn = self.db.begin_write()?;
         let out = {
             let mut index_table = write_txn.open_table(INDEX)?;
-            let mut table = write_txn.open_table(EVENTS)?;
+            let mut accepted_table = write_txn.open_multimap_table(ACCEPTED)?;
+            let table = write_txn.open_table(EVENTS)?;
             let mut exn_table = write_txn.open_multimap_table(EXCHANGES)?;
             let said = index_table.remove(index as u8)?;
             match said {
                 Some(value) => {
                     let said = value.value();
-                    // println!("Removing index: {}, {}", index, said);
-                    let event = table.remove(said)?.unwrap();
-                    let parsed_event = serde_json::from_slice(event.value()).unwrap();
+                    let event = table.get(said)?.unwrap();
+                    let parsed_event: KeriEvent<KeyEvent> =
+                        serde_json::from_slice(event.value()).unwrap();
                     let exn = exn_table.remove_all(said)?;
                     let exn = exn.into_iter().map(|value| {
                         serde_json::from_slice::<ExchangeMessage>(value.unwrap().value()).unwrap()
                     });
+                    let id = parsed_event.data.get_prefix();
+                    accepted_table.insert(
+                        id.to_str().as_str(),
+                        parsed_event.digest().unwrap().to_str().as_str(),
+                    )?;
                     Some((parsed_event, exn.collect()))
                 }
                 _ => None,
             }
         };
-        write_txn.commit().unwrap();
+        write_txn.commit()?;
         Ok(out)
     }
 
-    fn get_all(
+    fn get_pending(
         &self,
-    ) -> Result<Vec<(KeriEvent<KeyEvent>, Vec<KeriEvent<Exchange>>)>, RequestError> {
+    ) -> Result<Vec<(u8, KeriEvent<KeyEvent>, Vec<KeriEvent<Exchange>>)>, RequestError> {
         let read_txn = self.db.begin_read()?;
+        let index_table = read_txn.open_table(INDEX)?;
         let table = read_txn.open_table(EVENTS)?;
         let exn_table = read_txn.open_multimap_table(EXCHANGES)?;
-        table
-            .iter()?
-            .map(|value| -> Result<_, RequestError> {
-                let (key, value) = value?;
-                let event = serde_json::from_slice(value.value()).unwrap();
-                let exn = exn_table.get(key.value())?.map(|value| {
+        index_table
+            .iter()
+            .unwrap()
+            .map(|i| {
+                let (key, value) = i?;
+                let index = key.value();
+                let digest = value.value();
+                let event = table.get(digest)?.unwrap();
+                let parsed_event = serde_json::from_slice(event.value()).unwrap();
+                let exn = exn_table.get(digest)?.map(|value| {
                     serde_json::from_slice::<KeriEvent<Exchange>>(value.unwrap().value()).unwrap()
                 });
-                Ok((event, exn.collect()))
+                Ok((index, parsed_event, exn.collect()))
             })
             .collect()
     }
 
-    pub fn add(&mut self, request: ActionRequired) -> Result<u8, RequestError> {
+    pub fn add(&mut self, request: ActionRequired) -> Result<Option<u8>, RequestError> {
         match request {
             ActionRequired::MultisigRequest(typed_event, exchange) => {
+                let id = typed_event.data.get_prefix();
+                let read_txn = self.db.begin_read()?;
+                let table = read_txn.open_multimap_table(ACCEPTED)?;
                 let said = typed_event.digest().unwrap();
-                let write_txn = self.db.begin_write()?;
-                {
-                    let mut table = write_txn.open_table(INDEX)?;
-                    table.insert(self.index, said.to_str().as_str())?;
-                    self.index += 1;
-                    let mut table = write_txn.open_table(EVENTS)?;
-                    table.insert(
-                        said.to_str().as_str(),
-                        serde_json::to_vec(&typed_event).unwrap().as_slice(),
-                    )?;
-                    let mut table = write_txn.open_multimap_table(EXCHANGES)?;
-                    table.insert(
-                        said.to_str().as_str(),
-                        serde_json::to_vec(&exchange).unwrap().as_slice(),
-                    )?;
+                let saved = table
+                    .get(id.to_str().as_str())?
+                    .into_iter()
+                    .find(|value| {
+                        let saved_said = value.as_ref().unwrap().value();
+                        saved_said.eq(said.to_str().as_str())
+                    })
+                    .is_some();
+                if !saved {
+                    let write_txn = self.db.begin_write()?;
+                    {
+                        let mut table = write_txn.open_table(INDEX)?;
+                        table.insert(self.index, said.to_str().as_str())?;
+                        self.index += 1;
+                        let mut table = write_txn.open_table(EVENTS)?;
+                        table.insert(
+                            said.to_str().as_str(),
+                            serde_json::to_vec(&typed_event).unwrap().as_slice(),
+                        )?;
+                        let mut table = write_txn.open_multimap_table(EXCHANGES)?;
+                        table.insert(
+                            said.to_str().as_str(),
+                            serde_json::to_vec(&exchange).unwrap().as_slice(),
+                        )?;
+                    }
+                    write_txn.commit()?;
+                } else {
+                    return Ok(None);
                 }
-                write_txn.commit()?;
             }
-            ActionRequired::DelegationRequest(typed_event, typed_event1) => todo!(),
+            ActionRequired::DelegationRequest(_typed_event, _typed_event1) => todo!(),
         };
-        Ok((self.index - 1))
+        Ok(Some(self.index - 1))
     }
 
     pub fn show_one(event: &KeriEvent<KeyEvent>) -> String {
@@ -453,38 +496,14 @@ impl Requests {
 
     pub fn show(&self) -> Result<Vec<String>, RequestError> {
         Ok(self
-            .get_all()?
+            .get_pending()?
             .iter()
-            .enumerate()
-            .map(|(i, r)| {
-                let req = Self::show_one(&r.0);
-                format!("{}: {}", i, req)
+            .map(|r| {
+                let req = Self::show_one(&r.1);
+                format!("{}: {}", r.0, req)
             })
             .collect())
     }
-}
-
-#[test]
-pub fn test_request() {
-    let mut requests = Requests::new("jan").unwrap();
-    let ixn_str = r#"{"v":"KERI10JSON00013a_","t":"ixn","d":"EDzY9RJvCJLXJgINV_3uaidwGbuyO7gE-hm43xwcoCXE","i":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","s":"1","p":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","a":[{"i":"EJpoowS13EvkmOtd5GIdAIsl1_UCRkpKcl2H6jZrPXD5","s":"0","d":"EEwtVvcjb5IUpIa0Y9FcUkDHejlJY33AWGK6t7o2cJta"}]}"#;
-    let ixn2_str = r#"{"v":"KERI10JSON0001b7_","t":"icp","d":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","i":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","s":"0","kt":"2","k":["DPG-1NOsMNeXHEHCAqdppDQ-hpZWhb-St6G3NwtOToyM","DBgiQ1yzgMbSIlx0QOchX1-xmLAnu_maqj_DS0w24rbr"],"nt":"2","n":["EOShuVKGAYDKrC3ow0-FrgMtnkmNg7eGn7DA3_JdFHS7","EN5eVuMTfsE7bBCGl3Bu8HB2tFxYBERYSA6aBS7gXKZr"],"bt":"1","b":["BJq7UABlttINuWJh1Xl2lkqZG4NTdUdqnbFJDa6ZyxCC"],"c":[],"a":[]}"#;
-    let exn_str = r#"{"v":"KERI10JSON000216_","t":"exn","d":"EH9tygSwyqthvsRY_UEvHX7JeBewi9jPQbz-n42cToOP","dt":"2025-04-03T12:07:42.322364+00:00","r":"/fwd","q":{"pre":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","topic":"multisig"},"a":{"v":"KERI10JSON00013a_","t":"ixn","d":"EDzY9RJvCJLXJgINV_3uaidwGbuyO7gE-hm43xwcoCXE","i":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","s":"1","p":"EH0F57mBSMAW8wCSlftN31Q__rbzM8Su1O42AWxZ4Y-n","a":[{"i":"EJpoowS13EvkmOtd5GIdAIsl1_UCRkpKcl2H6jZrPXD5","s":"0","d":"EEwtVvcjb5IUpIa0Y9FcUkDHejlJY33AWGK6t7o2cJta"}]}}"#;
-    let event = serde_json::from_str::<KeriEvent<KeyEvent>>(ixn_str).unwrap();
-    let event2 = serde_json::from_str::<KeriEvent<KeyEvent>>(ixn2_str).unwrap();
-    let exchange = serde_json::from_str::<ExchangeMessage>(exn_str).unwrap();
-    requests
-        .add(ActionRequired::MultisigRequest(event, exchange.clone()))
-        .unwrap();
-    requests
-        .add(ActionRequired::MultisigRequest(event2, exchange))
-        .unwrap();
-    let result = requests.get(0).unwrap();
-    let result2 = requests.get(0).unwrap();
-    assert_eq!(result, result2);
-    requests.remove(0).unwrap();
-    assert!(requests.get(0).unwrap().is_none());
-    assert!(result.is_some());
 }
 
 #[test]

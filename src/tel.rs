@@ -20,7 +20,7 @@ use crate::{
     multisig::issue_group,
     said::SaidError,
     subcommands::membership::Membership,
-    utils::{load, load_signer, working_directory, LoadingError},
+    utils::{load, load_signer, working_directory, LoadingError, Requests},
     CliError,
 };
 
@@ -92,6 +92,7 @@ pub async fn handle_group_registry_incept(
     signer: Arc<Signer>,
     mem: Arc<Membership>,
     group_alias: &str,
+    requests: &Requests,
 ) -> Result<(), CliError> {
     if group_id.registry_id().is_none() {
         println!("Incepting registry");
@@ -101,11 +102,11 @@ pub async fn handle_group_registry_incept(
         let exn = event_generator::exchange(group_id.id(), &ixn, ForwardTopic::Multisig)
             .encode()
             .unwrap();
-        let ixn = ixn.encode().unwrap();
+        let ixn_encoded = ixn.encode().unwrap();
 
         let signature = SelfSigningPrefix::new(
             cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-            signer.sign(&ixn).unwrap(),
+            signer.sign(&ixn_encoded).unwrap(),
         );
 
         let exn_signature = SelfSigningPrefix::new(
@@ -119,11 +120,15 @@ pub async fn handle_group_registry_incept(
         );
 
         group_id
-            .finalize_group_event(&ixn, signature, vec![(exn, exn_sig)])
+            .finalize_group_event(&ixn_encoded, signature, vec![(exn, exn_sig)])
             .await
             .unwrap();
 
+        group_id.notify_backers().await.unwrap();
         mem.save_group_registry(group_alias, &reg_id.to_string());
+        requests
+            .save_accepted(&group_id.id(), &ixn.digest().unwrap())
+            .unwrap();
     };
     Ok(())
 }
@@ -134,6 +139,7 @@ pub async fn handle_group_issue(
     signer: Arc<Signer>,
     data: &str,
     scheme: String,
+    requests: &Requests,
 ) -> Result<(), CliError> {
     if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
         let mut attributes = InlineAttributes::default();
@@ -153,7 +159,7 @@ pub async fn handle_group_issue(
 
         let said = attestation.digest.clone().unwrap();
 
-        issue_group(&mut group_id, participant_id, said, signer)
+        issue_group(&mut group_id, participant_id, said, signer, requests)
             .await
             .unwrap();
         let attestation_str = String::from_utf8(

@@ -257,12 +257,14 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             let ewa_id = load_identifier(&alias).unwrap();
             let group_id = load_group_id(&alias, &group_alias).unwrap();
             let ewa_signer = Arc::new(load_signer(&alias).unwrap());
+            let requests = Requests::new(&alias).unwrap();
             handle_group_issue(
                 group_id,
                 &ewa_id,
                 ewa_signer,
                 &message,
                 oca_bundle_said.to_string(),
+                &requests,
             )
             .await
             .unwrap();
@@ -272,12 +274,14 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             let participant_id = load_identifier(&alias).unwrap();
             let signer = Arc::new(load_signer(&alias).unwrap());
             let membership = Arc::new(Membership::new(&alias));
+            let req = Requests::new(alias.as_str()).unwrap();
             handle_group_registry_incept(
                 &mut group_id,
                 &participant_id,
                 signer,
                 membership,
                 &group_alias,
+                &req,
             )
             .await
             .unwrap();
@@ -351,7 +355,9 @@ async fn pull_mailbox_helper(
         };
         let req_info = Requests::show_one(&requested_event);
         let index = requests.add(request).unwrap();
-        println!("New request: {}: {}", index, req_info);
+        if let Some(i) = index {
+            println!("New request: {}: {}", i, req_info);
+        }
     }
     for group in mem.group_ids() {
         let bob_group_mailbox = pull_group_mailbox(&mut identifier, &group, signer.clone())
@@ -364,7 +370,9 @@ async fn pull_mailbox_helper(
             };
             let req_info = Requests::show_one(&requested_event);
             let index = requests.add(request).unwrap();
-            println!("New group request: {}: {}", index, req_info);
+            if let Some(i) = index {
+                println!("New request: {}: {}", i, req_info);
+            }
         }
     }
 }

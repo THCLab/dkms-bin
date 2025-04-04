@@ -138,7 +138,7 @@ pub async fn accept(
     signer: Arc<Signer>,
     index: usize,
 ) -> Option<IdentifierPrefix> {
-    let action = req.remove(index).unwrap();
+    let action = req.accept(index).unwrap();
     match action {
         Some((event, exchanges)) => process_multisig_request(id, signer, event, exchanges)
             .await
@@ -192,14 +192,15 @@ pub async fn issue_group(
     participant_id: &IdentifierPrefix,
     cred_said: SelfAddressingIdentifier,
     km: Arc<Signer>,
+    requests: &Requests,
 ) -> Result<(), KeriError> {
     let (vc_id, ixn) = group_identifier.issue(cred_said.clone()).unwrap();
 
     let exn =
         event_generator::exchange(group_identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
-    let ixn = ixn.encode()?;
+    let ixn_encoded = ixn.encode()?;
 
-    let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn)?);
+    let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn_encoded)?);
 
     let exn_signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&exn)?);
 
@@ -218,8 +219,11 @@ pub async fn issue_group(
 
     assert_eq!(vc_id.to_string(), cred_said.to_string());
     group_identifier
-        .finalize_group_event(&ixn, signature, vec![(exn, exn_signature)])
+        .finalize_group_event(&ixn_encoded, signature, vec![(exn, exn_signature)])
         .await
+        .unwrap();
+    requests
+        .save_accepted(&ixn.data.prefix, &ixn.digest().unwrap())
         .unwrap();
 
     Ok(())
