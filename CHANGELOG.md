@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0-rc.2] - 2025-04-08
+
+### 🚀 Features
+
+- Allow group registry incepting
+- Add membership issue command
+
+### 🐛 Bug Fixes
+
+- Save accepted requests
+
+### 🚜 Refactor
+
+- Requests storage cleanup
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies
+
 ## [0.8.0-rc.1] - 2025-03-27
 
 ### 🚀 Features
@@ -15,6 +34,10 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - Reformat and fix comments
+
+### ⚙️ Miscellaneous Tasks
+
+- Release 0.8.0-rc.1 version
 
 ## [0.7.3] - 2025-03-25
 
