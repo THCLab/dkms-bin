@@ -350,8 +350,8 @@ async fn pull_mailbox_helper(
     let bob_mailbox = pull_mailbox(&mut identifier, signer.clone()).await.unwrap();
     for request in bob_mailbox {
         let requested_event = match &request {
-            ActionRequired::MultisigRequest(ev, exn) => ev,
-            ActionRequired::DelegationRequest(ev, exn) => todo!(),
+            ActionRequired::MultisigRequest(ev, _exn) => ev,
+            ActionRequired::DelegationRequest(_ev, _exn) => todo!(),
         };
         let req_info = Requests::show_one(&requested_event);
         let index = requests.add(request).unwrap();
@@ -365,8 +365,8 @@ async fn pull_mailbox_helper(
             .unwrap();
         for request in bob_group_mailbox {
             let requested_event = match &request {
-                ActionRequired::MultisigRequest(ev, exn) => ev,
-                ActionRequired::DelegationRequest(_ev, exn) => todo!(),
+                ActionRequired::MultisigRequest(ev, _exn) => ev,
+                ActionRequired::DelegationRequest(_ev, _exn) => todo!(),
             };
             let req_info = Requests::show_one(&requested_event);
             let index = requests.add(request).unwrap();

@@ -349,7 +349,7 @@ impl Requests {
         })
     }
 
-    fn get(
+    fn _get(
         &self,
         index: usize,
     ) -> Result<Option<(KeriEvent<KeyEvent>, Vec<KeriEvent<Exchange>>)>, RequestError> {

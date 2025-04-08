@@ -114,13 +114,13 @@ pub async fn handle_group_registry_incept(
             signer.sign(&exn).unwrap(),
         );
 
-        let exn_sig = Signature::Transferable(
+        let exn_index_signature = Signature::Transferable(
             SignerData::LastEstablishment(participant_id.clone()),
             vec![IndexedSignature::new_both_same(exn_signature, 0)],
         );
 
         group_id
-            .finalize_group_event(&ixn_encoded, signature, vec![(exn, exn_sig)])
+            .finalize_group_event(&ixn_encoded, signature, vec![(exn, exn_index_signature)])
             .await
             .unwrap();
 

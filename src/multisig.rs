@@ -62,25 +62,17 @@ pub async fn group_incept(
     let signature_exn =
         SelfSigningPrefix::Ed25519Sha512(initiator_signer.sign(exn_messages[0].as_bytes())?);
 
-    // Group initiator needs to use `finalize_group_incept` instead of just
-    // `finalize_event`, to send multisig request to other group participants.
-    // Identifier who get this request from mailbox, can use just `finalize_event`
-    let kc = initiator_id.find_state(initiator_id.id()).unwrap().current;
-    let index = initiator_id.index_in_current_keys(&kc).unwrap();
-    let sig_exn = Signature::Transferable(
-        SignerData::LastEstablishment(initiator_id.id().clone()),
-        vec![IndexedSignature::new_both_same(signature_exn, index as u16)],
-    );
+    let exn_index_signature = initiator_id.sign_with_index(signature_exn, 0)?;
 
     let group_id = initiator_id
-        .finalize_group_event(
+        .finalize_group_incept(
             group_inception.as_bytes(),
             signature_icp,
-            vec![(exn_messages[0].as_bytes().to_vec(), sig_exn)],
+            vec![(exn_messages[0].as_bytes().to_vec(), exn_index_signature)],
         )
         .await?;
 
-    Ok(group_id.unwrap())
+    Ok(group_id)
 }
 
 pub async fn pull_mailbox(
@@ -167,24 +159,34 @@ async fn process_multisig_request(
             let signature_exn =
                 SelfSigningPrefix::Ed25519Sha512(signer.sign(&serialized_exn).unwrap());
 
-            let kc = identifier.find_state(identifier.id()).unwrap().current;
-            let index = identifier.index_in_current_keys(&kc).unwrap();
-            let sig_exn = Signature::Transferable(
-                SignerData::LastEstablishment(identifier.id().clone()),
-                vec![IndexedSignature::new_both_same(signature_exn, index as u16)],
-            );
-            (serialized_exn, sig_exn)
+            let exn_index_signature = identifier.sign_with_index(signature_exn, 0).unwrap();
+            (serialized_exn, exn_index_signature)
         })
         .collect();
-
-    Ok(identifier
-        .finalize_group_event(
-            &multisig_event.encode().unwrap(),
-            signature_ixn.clone(),
-            signed_exchanges,
-        )
-        .await
-        .unwrap())
+    match multisig_event.event_type {
+        EventTypeTag::Icp | EventTypeTag::Dip => {
+            let id = identifier
+                .finalize_group_incept(
+                    &multisig_event.encode().unwrap(),
+                    signature_ixn.clone(),
+                    signed_exchanges,
+                )
+                .await
+                .unwrap();
+            Ok(Some(id))
+        }
+        _ => {
+            identifier
+                .finalize_group_event(
+                    &multisig_event.encode().unwrap(),
+                    signature_ixn.clone(),
+                    signed_exchanges,
+                )
+                .await
+                .unwrap();
+            Ok(None)
+        }
+    }
 }
 
 pub async fn issue_group(
@@ -203,23 +205,15 @@ pub async fn issue_group(
     let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn_encoded)?);
 
     let exn_signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&exn)?);
-
-    let participant_key = group_identifier
-        .find_state(participant_id)
-        .unwrap()
-        .current
-        .public_keys[0]
-        .clone();
-    let kc = group_identifier.current_public_keys().unwrap();
-    let index = kc.iter().position(|pk| pk.eq(&participant_key)).unwrap();
-    let exn_signature = Signature::Transferable(
+   
+    let exn_index_signature = Signature::Transferable(
         SignerData::LastEstablishment(participant_id.clone()),
-        vec![IndexedSignature::new_both_same(exn_signature, index as u16)],
+        vec![IndexedSignature::new_both_same(exn_signature, 0)],
     );
 
     assert_eq!(vc_id.to_string(), cred_said.to_string());
     group_identifier
-        .finalize_group_event(&ixn_encoded, signature, vec![(exn, exn_signature)])
+        .finalize_group_event(&ixn_encoded, signature, vec![(exn, exn_index_signature)])
         .await
         .unwrap();
     requests
