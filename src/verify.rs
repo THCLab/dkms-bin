@@ -38,6 +38,8 @@ pub enum VerifyHandleError {
     NoWatchersConfigured(IdentifierPrefix),
     #[error("Invalid credential: {0}")]
     InvalidCredential(String),
+    #[error("{0}")]
+    OtherError(String),
 }
 
 impl From<VerificationError> for VerifyHandleError {
@@ -168,44 +170,38 @@ pub async fn handle_verify(
         let said = att.digest.unwrap();
         let registry_id: SelfAddressingIdentifier = att.registry_identifier.parse().unwrap();
 
-        // Try to verify vc
-        match who_id.find_vc_state(&said) {
-            Ok(Some(state)) => {
-                return match_tel_state(Some(state));
-            }
-            _ => {
-                // check if any watcher was configured
-                match who_id.watchers() {
-                    Ok(watchers) if watchers.is_empty() => {
-                        return Err(VerifyHandleError::NoWatchersConfigured(who_id.id().clone()))
-                    }
-                    Ok(_watchers) => {}
-                    Err(_) => {
-                        return Err(VerifyHandleError::NoWatchersConfigured(who_id.id().clone()))
-                    }
-                };
-            }
-        }
-
         if find_oobis(&who_id, &issuer).is_empty() {
             return Err(VerifyHandleError::MissingOobi(issuer.clone()));
         };
 
         let signer = Arc::new(load_signer(alias).unwrap());
+        let cached_state = who_id.find_vc_state(&said).unwrap();
+        let mut delay = Duration::from_secs(1);
         for _i in 0..5 {
-            query_tel(&said, registry_id.clone(), &issuer, &who_id, signer.clone())
-                .await
-                .unwrap();
-            match who_id.find_vc_state(&said) {
-                Ok(Some(_state)) => {
-                    break;
-                }
-                _ => sleep(Duration::from_secs(1)),
+            let _ = query_tel(&said, registry_id.clone(), &issuer, &who_id, signer.clone()).await;
+            if who_id.find_vc_state(&said).unwrap() != cached_state {
+                break;
+            } else {
+                sleep(delay);
+                delay *= 2;
             }
         }
 
-        let st = who_id.find_vc_state(&said).unwrap();
-        match_tel_state(st)
+        // Try to verify vc
+        match who_id.find_vc_state(&said) {
+            Ok(Some(state)) => match_tel_state(Some(state)),
+            Ok(None) => Err(VerifyHandleError::OtherError("TEL not found".to_string())),
+            Err(e) => {
+                // check if any watcher was configured
+                match who_id.watchers() {
+                    Ok(watchers) if watchers.is_empty() => {
+                        Err(VerifyHandleError::NoWatchersConfigured(who_id.id().clone()))
+                    }
+                    Ok(_watchers) => Err(VerifyHandleError::OtherError(e.to_string())),
+                    Err(_) => Err(VerifyHandleError::NoWatchersConfigured(who_id.id().clone())),
+                }
+            }
+        }
     }
 }
 
