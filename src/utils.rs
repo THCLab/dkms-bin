@@ -81,7 +81,6 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
-        cont.cache.clone(),
     ))
 }
 
@@ -101,7 +100,6 @@ pub fn load_group_id(alias: &str, group_alias: &str) -> Result<Identifier, Loadi
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
-        cont.cache.clone(),
     ))
 }
 
