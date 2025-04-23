@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2025-04-23
+
+### 🚀 Features
+
+- Add oobi flag to issue command
+
+### 🐛 Bug Fixes
+
+- Check for updates before verify
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies
+
 ## [0.8.0-rc.2] - 2025-04-08
 
 ### 🚀 Features
@@ -20,6 +34,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Update dependencies
+- Release 0.8.0-rc.2 version
 
 ## [0.8.0-rc.1] - 2025-03-27
 
