@@ -18,6 +18,7 @@ use said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Enc
 use crate::{
     keri::{issue, query_tel, revoke},
     multisig::issue_group,
+    resolve,
     said::SaidError,
     subcommands::membership::Membership,
     utils::{load, load_signer, working_directory, LoadingError, Requests},
@@ -48,7 +49,12 @@ pub fn remove_registry(alias: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-pub async fn handle_issue(alias: &str, data: &str, scheme: String) -> Result<(), CliError> {
+pub async fn handle_issue(
+    alias: &str,
+    data: &str,
+    scheme: String,
+    oobi: bool,
+) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
     if let Ok(root) = serde_json::from_str::<indexmap::IndexMap<String, serde_json::Value>>(data) {
@@ -73,13 +79,25 @@ pub async fn handle_issue(alias: &str, data: &str, scheme: String) -> Result<(),
         let said = attestation.digest.clone().unwrap();
 
         issue(&mut id, said, signer).await?;
+        if oobi {
+            match resolve::find_oobi(&id, &None) {
+                Ok(lcs) => {
+                    let oobis = lcs.into_iter().fold(String::new(), |mut acc, oobi| {
+                        acc.push_str(&serde_json::to_string(&oobi).unwrap());
+                        acc
+                    });
+                    print!("{}", oobis)
+                }
+                Err(e) => println!("{}", e),
+            }
+        }
         let attestation_str = String::from_utf8(
             attestation
                 .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
                 .unwrap(),
         )
         .unwrap();
-        println!("{}", attestation_str);
+        print!("{}", attestation_str);
     } else {
         println!("Wrong json format: {}", data);
     };

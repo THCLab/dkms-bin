@@ -205,7 +205,7 @@ pub async fn issue_group(
     let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn_encoded)?);
 
     let exn_signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&exn)?);
-   
+
     let exn_index_signature = Signature::Transferable(
         SignerData::LastEstablishment(participant_id.clone()),
         vec![IndexedSignature::new_both_same(exn_signature, 0)],

@@ -51,6 +51,9 @@ pub enum DataCommand {
         /// OCA Bundle identifier
         #[arg(short = 'b', long, value_parser = parse_said)]
         oca_bundle_said: SelfAddressingIdentifier,
+        /// Prepend OOBIs to the output ACDC
+        #[arg(short, long)]
+        oobi: bool,
     },
     /// Revoke credential
     Revoke {
@@ -160,7 +163,10 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             alias,
             message: credential_json,
             oca_bundle_said,
-        } => handle_issue(&alias, &credential_json, oca_bundle_said.to_string()).await?,
+            oobi,
+        } => {
+            handle_issue(&alias, &credential_json, oca_bundle_said.to_string(), oobi).await?;
+        }
         DataCommand::Revoke {
             alias,
             credential: credential_json,
