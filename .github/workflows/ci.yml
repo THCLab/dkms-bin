@@ -49,8 +49,8 @@ jobs:
         include:
           - os: ubuntu-latest
             archive-suffix: "ubuntu-latest"
-          - os: ubuntu-20.04
-            archive-suffix: "ubuntu-20.04"
+          - os: ubuntu-24.04
+            archive-suffix: "ubuntu-24.04"
           - os: macos-latest
             archive-suffix: ""
           - os: windows-latest
