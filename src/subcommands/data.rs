@@ -1,5 +1,6 @@
+use base64::{prelude::BASE64_STANDARD, Engine};
 use clap::Subcommand;
-use said::SelfAddressingIdentifier;
+use said::{sad::SerializationFormats, SelfAddressingIdentifier};
 use std::io::{self, IsTerminal, Read};
 
 use crate::{
@@ -54,6 +55,9 @@ pub enum DataCommand {
         /// Prepend OOBIs to the output ACDC
         #[arg(short, long)]
         oobi: bool,
+        /// Use CBOR as serialization format. Output is CBOR-encoded binary data, represented in Base64.
+        #[arg(short, long)]
+        cbor: bool,
     },
     /// Revoke credential
     Revoke {
@@ -164,8 +168,21 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             message: credential_json,
             oca_bundle_said,
             oobi,
+            cbor,
         } => {
-            handle_issue(&alias, &credential_json, oca_bundle_said.to_string(), oobi).await?;
+            let format = if cbor {
+                SerializationFormats::CBOR
+            } else {
+                SerializationFormats::JSON
+            };
+            handle_issue(
+                &alias,
+                &credential_json,
+                oca_bundle_said.to_string(),
+                oobi,
+                format,
+            )
+            .await?;
         }
         DataCommand::Revoke {
             alias,
@@ -175,7 +192,37 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             (None, None) => println!("Credential or its SAID in expected"),
             (None, Some(said)) => handle_revoke(&alias, &said).await?,
             (Some(cred), None) => {
-                let said = extract_said(&cred)?;
+                let message = cred.trim();
+                let is_json = message.starts_with('{') || message.starts_with('[');
+                let said = if is_json {
+                    extract_said(&cred)?
+                } else {
+                    let cbor_cred = BASE64_STANDARD.decode(message).unwrap();
+                    // extract d value from cbor
+                    let val: serde_cbor::Value = serde_cbor::from_slice(&cbor_cred).unwrap();
+
+                    if let serde_cbor::Value::Map(map) = val {
+                        if let Some((_, name_val)) = map.iter().find(|(k, _)| {
+                            if let serde_cbor::Value::Text(s) = k {
+                                s == "d"
+                            } else {
+                                false
+                            }
+                        }) {
+                            if let serde_cbor::Value::Text(name_val) = name_val {
+                                let said: SelfAddressingIdentifier = name_val.parse().unwrap();
+                                said
+                            } else {
+                                return Err(CliError::MissingDigest);
+                            }
+                        } else {
+                            return Err(CliError::MissingDigest);
+                        }
+                    } else {
+                        return Err(CliError::JsonExpected);
+                    }
+                };
+
                 handle_revoke(&alias, &said).await?
             }
             (Some(_), Some(_)) => println!("Only one of credential or its SAID is expected"),

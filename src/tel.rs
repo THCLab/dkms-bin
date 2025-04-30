@@ -5,6 +5,7 @@ use std::{
 };
 
 use acdc::attributes::InlineAttributes;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
 use keri_core::{
     actor::{event_generator, prelude::SelfAddressingIdentifier},
@@ -54,6 +55,7 @@ pub async fn handle_issue(
     data: &str,
     scheme: String,
     oobi: bool,
+    format: SerializationFormats,
 ) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
@@ -74,6 +76,8 @@ pub async fn handle_issue(
             id.registry_id().unwrap().to_string(),
             scheme,
             attributes,
+            &format,
+            &HashFunctionCode::Blake3_256,
         );
 
         let said = attestation.digest.clone().unwrap();
@@ -91,13 +95,23 @@ pub async fn handle_issue(
                 Err(e) => println!("{}", e),
             }
         }
-        let attestation_str = String::from_utf8(
-            attestation
-                .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
-                .unwrap(),
-        )
-        .unwrap();
-        print!("{}", attestation_str);
+        let out = match format {
+            SerializationFormats::JSON => String::from_utf8(
+                attestation
+                    .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
+                    .unwrap(),
+            )
+            .unwrap(),
+            SerializationFormats::MGPK => todo!(),
+            SerializationFormats::CBOR => {
+                let encoded = attestation
+                    .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::CBOR)
+                    .unwrap();
+                BASE64_STANDARD.encode(encoded)
+            }
+        };
+
+        print!("{}", out);
     } else {
         println!("Wrong json format: {}", data);
     };
@@ -173,6 +187,8 @@ pub async fn handle_group_issue(
             group_id.registry_id().unwrap().to_string(),
             scheme,
             attributes,
+            &SerializationFormats::CBOR,
+            &HashFunctionCode::Blake3_256,
         );
 
         let said = attestation.digest.clone().unwrap();
@@ -182,7 +198,7 @@ pub async fn handle_group_issue(
             .unwrap();
         let attestation_str = String::from_utf8(
             attestation
-                .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
+                .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::CBOR)
                 .unwrap(),
         )
         .unwrap();

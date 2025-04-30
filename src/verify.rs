@@ -1,6 +1,7 @@
 use std::{sync::Arc, thread::sleep, time::Duration};
 
 use acdc::Attestation;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use keri_controller::{
     communication::SendingError, error::ControllerError, identifier::Identifier, IdentifierPrefix,
     LocationScheme, Oobi, TelState,
@@ -116,9 +117,15 @@ pub async fn handle_verify(
         };
     }
     let message = message.trim();
+    let is_json = message.starts_with('{') || message.starts_with('[');
+    let message_bytes = if is_json {
+        message.as_bytes().to_vec()
+    } else {
+        BASE64_STANDARD.decode(message).unwrap()
+    };
 
     // Parse cesr stream of message
-    let (rest, cesr) = cesrox::parse(message.as_bytes()).unwrap();
+    let (rest, cesr) = cesrox::parse(&message_bytes).unwrap();
     if !rest.is_empty() {
         return Err(VerifyHandleError::RemainingCESR(
             String::from_utf8(rest.to_vec()).unwrap(),
@@ -126,7 +133,7 @@ pub async fn handle_verify(
     };
     let attachments = cesr.attachments;
     if !attachments.is_empty() {
-        match who_id.verify_from_cesr(message) {
+        match who_id.known_events.verify_from_cesr(&message_bytes) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
             Err(ControllerError::VerificationError(e)) => {
                 if e.iter().any(|(e, _)| {
@@ -164,8 +171,13 @@ pub async fn handle_verify(
             Err(_e) => todo!(),
         }
     } else {
-        let att: Attestation = serde_json::from_str(message)
-            .map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?;
+        let att: Attestation = match cesr.payload {
+            cesrox::payload::Payload::JSON(items) => serde_json::from_slice(&items)
+                .map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?,
+            cesrox::payload::Payload::CBOR(items) => serde_cbor::from_slice(&items)
+                .map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?,
+            cesrox::payload::Payload::MGPK(_items) => todo!(),
+        };
         let issuer: IdentifierPrefix = att.issuer.parse().unwrap();
         let said = att.digest.unwrap();
         let registry_id: SelfAddressingIdentifier = att.registry_identifier.parse().unwrap();
