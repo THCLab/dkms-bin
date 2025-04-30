@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2025-04-30
+
+### 🚀 Features
+
+- Allow issue acdc in cbor
+
+### 🐛 Bug Fixes
+
+- Update ci.yml
+
 ## [0.8.0] - 2025-04-23
 
 ### 🚀 Features
@@ -15,6 +25,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Update dependencies
+- Release 0.8.0 version
 
 ## [0.8.0-rc.2] - 2025-04-08
 
