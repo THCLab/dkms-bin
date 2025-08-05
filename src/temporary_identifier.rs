@@ -9,7 +9,7 @@ use keri_controller::{
 };
 use keri_core::{
     actor::{
-        error::ActorError, prelude::Message, possible_response::PossibleResponse, QueryError,
+        error::ActorError, possible_response::PossibleResponse, prelude::Message, QueryError,
         SignedQueryError,
     },
     processor::escrow::EscrowConfig,

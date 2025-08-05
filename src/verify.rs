@@ -3,10 +3,17 @@ use std::{sync::Arc, thread::sleep, time::Duration};
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use keri_controller::{
-    communication::SendingError, error::ControllerError, identifier::Identifier, IdentifierPrefix,
-    LocationScheme, Oobi, TelState,
+    communication::SendingError,
+    error::ControllerError,
+    identifier::{query::QueryResponse, Identifier},
+    IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix, TelState,
 };
-use keri_core::processor::validator::{MoreInfoError, VerificationError};
+use keri_core::{
+    event::sections::seal::EventSeal,
+    event_message::signature::{get_signatures, Signature, SignerData},
+    processor::validator::{MoreInfoError, VerificationError},
+    query::query_event::QueryEvent,
+};
 use said::SelfAddressingIdentifier;
 
 use crate::{
@@ -105,7 +112,6 @@ pub async fn handle_verify(
     let oobis = parse_json_arguments::<Oobi>(oobi)
         .map_err(|e| VerifyHandleError::WrongOobiFormat(e.to_string()))?;
     for oobi in oobis {
-        let _ = who_id.resolve_oobi(&oobi).await;
         match who_id.send_oobi_to_watcher(who_id.id(), &oobi).await {
             Ok(_) => (),
             Err(e) => match e {
@@ -132,6 +138,33 @@ pub async fn handle_verify(
         ));
     };
     let attachments = cesr.attachments;
+    let signatures: Vec<_> = attachments
+        .iter()
+        .flat_map(|att| get_signatures(att.clone()).unwrap())
+        .collect();
+    for sig in signatures.iter() {
+        match sig {
+            Signature::Transferable(signer_data, _) => match signer_data {
+                SignerData::EventSeal(event_seal) => {
+                    let state = who_id.find_state(&event_seal.prefix);
+                    match state {
+                        Ok(state) if state.sn <= event_seal.sn => {
+                            update_kel_with_seal(alias, &who_id, event_seal).await?;
+                        }
+                        Ok(_) => (),
+                        Err(_e) => {
+                            update_kel_with_seal(alias, &who_id, event_seal).await?;
+                        }
+                    }
+                }
+                SignerData::LastEstablishment(identifier_prefix) => {
+                    update_kel(alias, &who_id, identifier_prefix).await?
+                }
+                SignerData::JustSignatures => (),
+            },
+            Signature::NonTransferable(_) => (),
+        };
+    }
     if !attachments.is_empty() {
         match who_id.known_events.verify_from_cesr(&message_bytes) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
@@ -182,9 +215,7 @@ pub async fn handle_verify(
         let said = att.digest.unwrap();
         let registry_id: SelfAddressingIdentifier = att.registry_identifier.parse().unwrap();
 
-        if find_oobis(&who_id, &issuer).is_empty() {
-            return Err(VerifyHandleError::MissingOobi(issuer.clone()));
-        };
+        update_kel(alias, &who_id, &issuer).await?;
 
         let signer = Arc::new(load_signer(alias).unwrap());
         let cached_state = who_id.find_vc_state(&said).unwrap();
@@ -215,6 +246,67 @@ pub async fn handle_verify(
             }
         }
     }
+}
+
+async fn update_kel(
+    alias: &str,
+    who_id: &Identifier,
+    about_who: &IdentifierPrefix,
+) -> Result<(), VerifyHandleError> {
+    let signer =
+        load_signer(alias).map_err(|_| VerifyHandleError::UnknownIdentifier(alias.to_string()))?;
+    for watcher in who_id
+        .watchers()
+        .map_err(|_| VerifyHandleError::NoWatchersConfigured(who_id.id().clone()))?
+    {
+        let qry = who_id
+            .query_full_log(about_who, watcher)
+            .map_err(|e| VerifyHandleError::OtherError(e.to_string()))?;
+        let signature =
+            SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
+        query_with_retries(who_id, qry, signature).await?;
+    }
+
+    Ok(())
+}
+
+async fn update_kel_with_seal(
+    alias: &str,
+    who_id: &Identifier,
+    event_seal: &EventSeal,
+) -> Result<(), VerifyHandleError> {
+    let signer =
+        load_signer(alias).map_err(|_| VerifyHandleError::UnknownIdentifier(alias.to_string()))?;
+    for query in who_id.query_watchers(event_seal).unwrap() {
+        let signature =
+            SelfSigningPrefix::Ed25519Sha512(signer.sign(query.encode().unwrap()).unwrap());
+        query_with_retries(who_id, query, signature).await?;
+    }
+
+    Ok(())
+}
+
+async fn query_with_retries(
+    who_id: &Identifier,
+    qry: QueryEvent,
+    signature: SelfSigningPrefix,
+) -> Result<(), VerifyHandleError> {
+    let mut qr = QueryResponse::NoUpdates;
+
+    let mut delay = Duration::from_secs(1);
+    for _i in 0..5 {
+        let (qry_reps, _errs) = who_id
+            .finalize_query(vec![(qry.clone(), signature.clone())])
+            .await;
+        qr = qry_reps;
+        if qr == QueryResponse::NoUpdates {
+            sleep(delay);
+            delay *= 2;
+        } else {
+            break;
+        }
+    }
+    Ok(())
 }
 
 fn find_oobis(who_id: &Identifier, issuer: &IdentifierPrefix) -> Vec<LocationScheme> {
