@@ -16,7 +16,7 @@ use keri_core::{
     signer::Signer,
     transport::default::DefaultTransport,
 };
-use teliox::transport::TelTransport;
+use keri_controller::communication::HTTPTelTransport;
 use tempfile::Builder;
 
 use crate::export::ExportError;
@@ -31,7 +31,7 @@ pub fn generate_temporary_identifier() -> Result<TemporaryIdentifier, ExportErro
     let signer = Arc::new(Signer::new());
     let bp = BasicPrefix::Ed25519NT(signer.public_key());
     let transport = Box::new(DefaultTransport::new());
-    let tel_transport = Box::new(TelTransport);
+    let tel_transport = Box::new(HTTPTelTransport);
     let tmp_dir = Builder::new()
         .prefix("tmp-dir")
         .tempdir()
