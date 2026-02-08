@@ -1,148 +1,13 @@
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-## [0.8.1] - 2025-04-30
+## [0.8.2] - 2026-02-08
 
 ### 🚀 Features
 
-- Allow issue acdc in cbor
-
-### 🐛 Bug Fixes
-
-- Update ci.yml
-
-## [0.8.0] - 2025-04-23
-
-### 🚀 Features
-
-- Add oobi flag to issue command
-
-### 🐛 Bug Fixes
-
-- Check for updates before verify
-
-### ⚙️ Miscellaneous Tasks
-
-- Update dependencies
-- Release 0.8.0 version
-
-## [0.8.0-rc.2] - 2025-04-08
-
-### 🚀 Features
-
-- Allow group registry incepting
-- Add membership issue command
-
-### 🐛 Bug Fixes
-
-- Save accepted requests
-
-### 🚜 Refactor
-
-- Requests storage cleanup
-
-### ⚙️ Miscellaneous Tasks
-
-- Update dependencies
-- Release 0.8.0-rc.2 version
-
-## [0.8.0-rc.1] - 2025-03-27
-
-### 🚀 Features
-
-- Add multisig submodule
-- Add membership command
-- Accept incoming group requests
-- Add pull option to pending command
-- Allow signing with group identifier
-
-### 🚜 Refactor
-
-- Reformat and fix comments
-
-### ⚙️ Miscellaneous Tasks
-
-- Release 0.8.0-rc.1 version
-
-## [0.7.3] - 2025-03-25
-
-### 🐛 Bug Fixes
-
-- Correct import command behavior
-
-### ⚙️ Miscellaneous Tasks
-
-- Release 0.7.3 version
-
-## [0.7.2] - 2025-03-17
-
-### 🐛 Bug Fixes
-
-- Allow binary input digesting command
-
-### ⚙️ Miscellaneous Tasks
-
-- Release 0.7.2 version
-
-## [0.7.1] - 2025-03-14
-
-### 🐛 Bug Fixes
-
-- Add -d flag to digesting command
-
-### ⚙️ Miscellaneous Tasks
-
-- Release 0.7.1 version
-
-## [0.7.0] - 2025-03-13
-
-### 🚀 Features
-
-- Use acdc crate
-- Set schema in issue command
-- Add said digesting command
-
-### 🐛 Bug Fixes
-
-- Remove unwraps
-- Expect valid said as oca bundle identifier
-- Refine error message in debug command
-
-### ⚙️ Miscellaneous Tasks
-
-- Release 0.7.0 version
-
-## [0.6.1] - 2025-02-27
-
-### 🐛 Bug Fixes
-
-- Cleanup database before alias overwriting
-
-### ⚙️ Miscellaneous Tasks
-
-- Add command descriptions
-- Cargo fmt
-- Release 0.6.1 version
-
-## [0.6.0] - 2025-01-29
-
-### 🚀 Features
-
-- Add debug command
-
-### 🐛 Bug Fixes
-
-- Fix import command
-
-### ⚙️ Miscellaneous Tasks
-
-- Release 0.6.0 version
-
-## [0.5.0] - 2025-01-16
-
-### 🚀 Features
-
+- Print help if no commands
+- Add kel find command
+- Add expand command
+- Describe attachments in expand command
+- Customize help output
+- Add init --seed-file option
 - Rename whoami to info
 - Use url instead of oobis in init command
 - Add invalid signatures state
@@ -155,9 +20,27 @@ All notable changes to this project will be documented in this file.
 - Allow to read from stdin for verify cmd
 - Rename expand to inspect
 - Add revoke command
+- Add debug command
+- Use acdc crate
+- Set schema in issue command
+- Add said digesting command
+- Add multisig submodule
+- Add membership command
+- Accept incoming group requests
+- Add pull option to pending command
+- Allow signing with group identifier
+- Allow group registry incepting
+- Add membership issue command
+- Add oobi flag to issue command
+- Allow issue acdc in cbor
 
 ### 🐛 Bug Fixes
 
+- Restrict signing to valid JSON inputs
+- Better errors in issue command
+- Remove whitespaces in expand command
+- Better error from said command
+- Fix parsing seed file
 - Update short options for data issue
 - Fix identifier info command
 - Handle unknown alias in verify
@@ -175,37 +58,27 @@ All notable changes to this project will be documented in this file.
 - Clear registry id while init
 - Ask for confirmation when alias already exists
 - Verify issued credential
+- Fix import command
+- Cleanup database before alias overwriting
+- Remove unwraps
+- Expect valid said as oca bundle identifier
+- Refine error message in debug command
+- Add -d flag to digesting command
+- Allow binary input digesting command
+- Correct import command behavior
+- Save accepted requests
+- Check for updates before verify
+- Update ci.yml
+- Update dependency and fix compilation errors
+- Update kel while verifing
+- Update teliox dependency
 
-### ⚙️ Miscellaneous Tasks
+### 💼 Other
 
-- Fix clippy warnings
-- Update keri dependencies
-- Release 0.5.0 version
-
-### Build
-
+- Bump cesrox version
 - Update ci.yml
 - Update ci.yml
 - Update ci.yml
-
-## [0.4.0] - 2024-11-28
-
-### 🚀 Features
-
-- Print help if no commands
-- Add kel find command
-- Add expand command
-- Describe attachments in expand command
-- Customize help output
-- Add init --seed-file option
-
-### 🐛 Bug Fixes
-
-- Restrict signing to valid JSON inputs
-- Better errors in issue command
-- Remove whitespaces in expand command
-- Better error from said command
-- Fix parsing seed file
 
 ### 🚜 Refactor
 
@@ -220,17 +93,33 @@ All notable changes to this project will be documented in this file.
 - Move issue command
 - Remove file option from sad command
 - Rename data issue option
+- Reformat and fix comments
+- Requests storage cleanup
 
 ### ⚙️ Miscellaneous Tasks
 
 - Improve documentation in the help for init
 - Bump cesrox version
 - Release 0.4.0 version
-
-### Ichore
-
-- Bump cesrox version
-
+- Fix clippy warnings
+- Update keri dependencies
+- Release 0.5.0 version
+- Release 0.6.0 version
+- Add command descriptions
+- Cargo fmt
+- Release 0.6.1 version
+- Release 0.7.0 version
+- Release 0.7.1 version
+- Release 0.7.2 version
+- Release 0.7.3 version
+- Release 0.8.0-rc.1 version
+- Update dependencies
+- Release 0.8.0-rc.2 version
+- Update dependencies
+- Release 0.8.0 version
+- Release 0.8.1 version
+- Bump cesrox, keri and said
+- Add .cargo to gitignore
 ## [0.3.0] - 2024-11-20
 
 ### 🚀 Features
@@ -253,12 +142,15 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Release 0.3.0 version
-
 ## [0.2.1] - 2024-11-15
 
 ### 🚀 Features
 
 - Add verify command
+
+### 💼 Other
+
+- Fix clippy warnings and reformat
 
 ### 🚜 Refactor
 
@@ -270,11 +162,6 @@ All notable changes to this project will be documented in this file.
 
 - Create README.md
 - Release 0.2.1 version
-
-### Reformat
-
-- Fix clippy warnings and reformat
-
 ## [0.2.0] - 2024-11-13
 
 ### 🚀 Features
@@ -287,5 +174,3 @@ All notable changes to this project will be documented in this file.
 - Add release.toml
 - Add CI
 - Release 0.2.0 version
-
-<!-- generated by git-cliff -->
