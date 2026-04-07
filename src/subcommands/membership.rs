@@ -390,7 +390,7 @@ async fn pull_mailbox_helper(
         // Convert back to ActionRequired and store for deferred acceptance.
         let action = request.into_action_required();
         match requests.add(action) {
-            Ok(Some(idx)) => {
+            Ok(Some(_idx)) => {
                 println!("New pending request stored:");
                 // Re-read from DB to display formatted info.
                 let all = requests.show().unwrap();
@@ -409,8 +409,7 @@ async fn pull_mailbox_helper(
     }
 }
 
-use keri_controller::identifier::mechanics::MechanicsError;
-use keri_sdk::{Identifier, IdentifierPrefix, Oobi, PendingRequest, Signer};
+use keri_sdk::{Identifier, IdentifierPrefix, Oobi, Signer};
 use redb::{
     Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
 };

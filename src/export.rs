@@ -9,7 +9,6 @@ use keri_core::{
     event::sections::seal::EventSeal,
     oobi::Role,
 };
-use keri_sdk::Identifier;
 use serde::{Deserialize, Serialize};
 
 use crate::tel::save_registry;

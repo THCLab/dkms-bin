@@ -287,15 +287,12 @@ async fn query_with_retries(
     qry: QueryEvent,
     signature: SelfSigningPrefix,
 ) -> Result<(), VerifyHandleError> {
-    let mut qr = QueryResponse::NoUpdates;
-
     let mut delay = Duration::from_secs(1);
     for _i in 0..5 {
         let (qry_reps, _errs) = who_id
             .finalize_query(vec![(qry.clone(), signature.clone())])
             .await;
-        qr = qry_reps;
-        if qr == QueryResponse::NoUpdates {
+        if qry_reps == QueryResponse::NoUpdates {
             sleep(delay);
             delay *= 2;
         } else {

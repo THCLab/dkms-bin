@@ -424,38 +424,6 @@ impl Requests {
             .collect()
     }
 
-    /// Store a pending request from the mailbox.
-    ///
-    /// Accepts a [`PendingRequest`] from the SDK's `poll_pending_requests`
-    /// and persists it for deferred acceptance.
-    pub fn add_pending(&mut self, request: keri_sdk::PendingRequest) -> Result<Option<u8>, RequestError> {
-        match request {
-            keri_sdk::PendingRequest::Multisig(req) => {
-                // Reconstruct ActionRequired to get the raw event data for storage.
-                // The MultisigRequest fields are pub(crate) in keri-sdk, but we
-                // can get the group prefix for deduplication.
-                let group_prefix = req.group_prefix();
-                // We need to convert back — this is the bridge between the opaque
-                // SDK types and our local request persistence. In practice, we
-                // re-create the ActionRequired from the internal event/exchange.
-                //
-                // Since MultisigRequest wraps ActionRequired::MultisigRequest
-                // internally, and we stored the original ActionRequired, we pass
-                // through the raw keri_controller type in `add()`.
-                //
-                // For new code, prefer accepting immediately via
-                // `accept_multisig()` instead of storing.
-                let _ = group_prefix;
-                // Cannot decompose opaque type — see add() for ActionRequired path.
-                Ok(None)
-            }
-            keri_sdk::PendingRequest::Delegation(_req) => {
-                // Delegation requests are not yet stored in the local DB.
-                Ok(None)
-            }
-        }
-    }
-
     /// Store a pending request using the raw `ActionRequired` from keri-controller.
     ///
     /// This is the bridge for code that still works with the lower-level mailbox

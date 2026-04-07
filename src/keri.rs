@@ -1,17 +1,12 @@
 use anyhow::Result;
 use keri_sdk::{
-    operations::{
-        add_watcher, create_identifier, incept_registry, issue, query_mailbox, revoke, rotate,
-    },
-    types::{IdentifierConfig, RotationConfig},
+    operations::{incept_registry, issue, revoke, rotate},
+    types::RotationConfig,
     BasicPrefix, IdentifierPrefix, LocationScheme, SelfSigningPrefix,
     Identifier, Signer,
 };
-use keri_core::{
-    actor::prelude::SelfAddressingIdentifier,
-    query::mailbox::SignedMailboxQuery,
-};
-use std::{path::PathBuf, sync::Arc};
+use keri_core::actor::prelude::SelfAddressingIdentifier;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -28,24 +23,6 @@ pub enum KeriError {
     Sdk(#[from] keri_sdk::Error),
 }
 
-pub async fn setup_identifier(
-    db_path: PathBuf,
-    signer: Arc<Signer>,
-    next_pk: BasicPrefix,
-    witnesses: Vec<LocationScheme>,
-    witness_threshold: u64,
-    _messagebox: Option<LocationScheme>,
-    watchers: Vec<LocationScheme>,
-) -> Result<Identifier, KeriError> {
-    let config = IdentifierConfig {
-        witnesses,
-        witness_threshold,
-        watchers,
-    };
-    let id = create_identifier(db_path, signer, next_pk, config).await?;
-    Ok(id)
-}
-
 pub async fn handle_incept_registry(
     id: &mut Identifier,
     signer: Arc<Signer>,
@@ -59,14 +36,6 @@ pub async fn handle_incept_registry(
     }
     incept_registry(id, signer).await?;
     Ok(())
-}
-
-pub async fn handle_query_mailbox(
-    id: &mut Identifier,
-    km: Arc<Signer>,
-    witness_id: &BasicPrefix,
-) -> Result<Vec<SignedMailboxQuery>, KeriError> {
-    Ok(query_mailbox(id, km, witness_id).await?)
 }
 
 pub async fn query_tel(
@@ -126,11 +95,3 @@ pub async fn handle_revoke(
     Ok(())
 }
 
-pub async fn handle_add_watcher(
-    id: &mut Identifier,
-    km: Arc<Signer>,
-    watcher_oobi: &LocationScheme,
-) -> Result<(), KeriError> {
-    add_watcher(id, &km, watcher_oobi).await?;
-    Ok(())
-}

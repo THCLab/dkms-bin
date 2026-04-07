@@ -34,6 +34,7 @@ pub(crate) struct KelConfig {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ConfigError(ConfigFileError);
 
 impl Display for ConfigError {
