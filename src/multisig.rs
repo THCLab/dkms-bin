@@ -1,129 +1,83 @@
 use std::sync::Arc;
 
-use cesrox::primitives::codes::self_signing::SelfSigning;
-use keri_controller::{
-    identifier::Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
-    Oobi, SelfSigningPrefix,
+use keri_sdk::{
+    operations::{
+        accept_multisig, create_multisig, poll_pending_requests, sync_multisig,
+    },
+    types::{MultisigConfig, PendingRequest},
+    Identifier, IdentifierPrefix, LocationScheme, SelfSigningPrefix,
+    Signer,
 };
 use keri_core::{
     actor::event_generator,
     event::KeyEvent,
     event_message::{
-        msg::{KeriEvent, TypedEvent},
+        msg::KeriEvent,
         signature::{Signature, SignerData},
-        timestamped::Timestamped,
-        EventTypeTag,
     },
-    mailbox::exchange::{ExchangeMessage, ForwardTopic},
+    mailbox::exchange::ForwardTopic,
     prefix::IndexedSignature,
-    query::mailbox::MailboxRoute,
-    signer::Signer,
 };
 use said::SelfAddressingIdentifier;
 
 use crate::{error::CliError, keri::KeriError, utils::Requests};
 
+/// Create a multisig group identifier (initiator side).
+///
+/// Resolves witness OOBIs, creates the group inception event, signs it,
+/// and sends invitations to all members. Returns the group `IdentifierPrefix`.
 pub async fn group_incept(
     initiator_id: &mut Identifier,
     initiator_signer: Arc<Signer>,
     members: Vec<IdentifierPrefix>,
     key_threshold: u64,
-    next_keys_threshold: Option<u64>,
-    witness: Vec<LocationScheme>,
+    _next_keys_threshold: Option<u64>,
+    witnesses: Vec<LocationScheme>,
     witness_threshold: u64,
 ) -> Result<IdentifierPrefix, KeriError> {
-    // proces witness oobis
-    for witness_oobi in &witness {
+    // Resolve witness OOBIs before creating the group.
+    for witness_oobi in &witnesses {
         initiator_id
-            .resolve_oobi(&Oobi::Location(witness_oobi.clone()))
+            .resolve_oobi(&keri_sdk::Oobi::Location(witness_oobi.clone()))
             .await?;
     }
 
-    let witnesses_id = witness
-        .into_iter()
-        .map(|witness| match witness.eid {
-            IdentifierPrefix::Basic(id) => id,
-            _ => todo!(),
-        })
-        .collect();
-
-    // Incept group
-    let (group_inception, exn_messages) = initiator_id.incept_group(
+    let config = MultisigConfig {
         members,
-        key_threshold,
-        next_keys_threshold,
-        Some(witnesses_id),
-        Some(witness_threshold),
-        None,
-    )?;
+        threshold: key_threshold,
+        witnesses,
+        witness_threshold,
+        delegator: None,
+    };
 
-    let signature_icp =
-        SelfSigningPrefix::Ed25519Sha512(initiator_signer.sign(group_inception.as_bytes())?);
-    let signature_exn =
-        SelfSigningPrefix::Ed25519Sha512(initiator_signer.sign(exn_messages[0].as_bytes())?);
-
-    let exn_index_signature = initiator_id.sign_with_index(signature_exn, 0)?;
-
-    let group_id = initiator_id
-        .finalize_group_incept(
-            group_inception.as_bytes(),
-            signature_icp,
-            vec![(exn_messages[0].as_bytes().to_vec(), exn_index_signature)],
-        )
-        .await?;
-
+    let group_id = create_multisig(initiator_id, &initiator_signer, config).await?;
     Ok(group_id)
 }
 
+/// Poll the identifier's mailbox for pending requests (delegation or multisig).
 pub async fn pull_mailbox(
     identifier: &mut Identifier,
     signer: Arc<Signer>,
-) -> Result<Vec<ActionRequired>, CliError> {
-    let witnesses = identifier.witnesses();
-
-    // Quering mailbox to get multisig request
-    let query: Vec<TypedEvent<EventTypeTag, Timestamped<MailboxRoute>>> = identifier
-        .query_mailbox(&identifier.id(), &witnesses.collect::<Vec<_>>())
-        .unwrap();
-
-    let mut out = Vec::new();
-    for qry in query {
-        let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.clone().sign(&qry.encode().unwrap()).unwrap());
-        let mut action_required = identifier
-            .finalize_query_mailbox(vec![(qry, signature)])
-            .await
-            .unwrap();
-        out.append(&mut action_required);
-    }
-    Ok(out)
+) -> Result<Vec<PendingRequest>, CliError> {
+    let requests = poll_pending_requests(identifier, &signer)
+        .await
+        .map_err(|e| CliError::KeriError(KeriError::Sdk(e)))?;
+    Ok(requests)
 }
 
+/// Synchronise multisig state: collect co-signatures and witness receipts.
 pub async fn pull_group_mailbox(
     identifier: &mut Identifier,
     group_id: &IdentifierPrefix,
     signer: Arc<Signer>,
-) -> Result<Vec<ActionRequired>, CliError> {
-    let witnesses = identifier.witnesses();
-
-    // Quering mailbox to get multisig request
-    let query: Vec<TypedEvent<EventTypeTag, Timestamped<MailboxRoute>>> = identifier
-        .query_mailbox(group_id, &witnesses.collect::<Vec<_>>())
-        .unwrap();
-
-    let mut out = Vec::new();
-    for qry in query {
-        let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.clone().sign(&qry.encode().unwrap()).unwrap());
-        let mut action_required = identifier
-            .finalize_query_mailbox(vec![(qry, signature)])
-            .await
-            .unwrap();
-        out.append(&mut action_required);
-    }
-    Ok(out)
+) -> Result<(), CliError> {
+    sync_multisig(identifier, &signer, group_id)
+        .await
+        .map_err(|e| CliError::KeriError(KeriError::Sdk(e)))?;
+    Ok(())
 }
 
+/// Accept a pending multisig request from the Requests DB.
 pub async fn accept(
     id: &mut Identifier,
     req: Requests,
@@ -132,54 +86,72 @@ pub async fn accept(
 ) -> Option<IdentifierPrefix> {
     let action = req.accept(index).unwrap();
     match action {
-        Some((event, exchanges)) => process_multisig_request(id, signer, event, exchanges)
-            .await
-            .unwrap(),
+        Some((event, exchanges)) => {
+            process_multisig_request(id, signer, event, exchanges)
+                .await
+                .unwrap()
+        }
         None => None,
     }
 }
 
+/// Process a raw multisig request from the local request DB.
+///
+/// For inception/delegated-inception events, this reconstructs an
+/// `ActionRequired::MultisigRequest` and passes it through the SDK's
+/// `accept_multisig`. For other event types (e.g., group interactions),
+/// it uses the lower-level `finalize_group_event` path.
 async fn process_multisig_request(
     identifier: &mut Identifier,
     signer: Arc<Signer>,
     multisig_event: KeriEvent<KeyEvent>,
-    exchanges: Vec<ExchangeMessage>,
+    exchanges: Vec<keri_core::mailbox::exchange::ExchangeMessage>,
 ) -> Result<Option<IdentifierPrefix>, CliError> {
+    use keri_core::event_message::EventTypeTag;
+    use keri_sdk::ActionRequired;
+
     println!(
         "Got multisig request: {}",
         String::from_utf8(multisig_event.encode().unwrap()).unwrap()
     );
-    let signature_ixn =
-        SelfSigningPrefix::Ed25519Sha512(signer.sign(&multisig_event.encode().unwrap()).unwrap());
 
-    let signed_exchanges = exchanges
-        .into_iter()
-        .map(|exn| {
-            let serialized_exn = exn.encode().unwrap();
-            let signature_exn =
-                SelfSigningPrefix::Ed25519Sha512(signer.sign(&serialized_exn).unwrap());
-
-            let exn_index_signature = identifier.sign_with_index(signature_exn, 0).unwrap();
-            (serialized_exn, exn_index_signature)
-        })
-        .collect();
     match multisig_event.event_type {
         EventTypeTag::Icp | EventTypeTag::Dip => {
-            let id = identifier
-                .finalize_group_incept(
-                    &multisig_event.encode().unwrap(),
-                    signature_ixn.clone(),
-                    signed_exchanges,
-                )
+            // Reconstruct ActionRequired and convert to MultisigRequest for SDK.
+            let action = ActionRequired::MultisigRequest(
+                multisig_event,
+                exchanges.into_iter().next().unwrap(),
+            );
+            let request = keri_sdk::MultisigRequest::try_from(action).unwrap();
+            let group_prefix = request.group_prefix();
+            accept_multisig(identifier, &signer, request)
                 .await
-                .unwrap();
-            Ok(Some(id))
+                .map_err(|e| CliError::KeriError(KeriError::Sdk(e)))?;
+            Ok(Some(group_prefix))
         }
         _ => {
+            // Non-inception group events (e.g. ixn for credential issuance)
+            // still need the lower-level path.
+            let signature_ixn = SelfSigningPrefix::Ed25519Sha512(
+                signer.sign(&multisig_event.encode().unwrap()).unwrap(),
+            );
+
+            let signed_exchanges: Vec<(Vec<u8>, Signature)> = exchanges
+                .into_iter()
+                .map(|exn| {
+                    let serialized_exn = exn.encode().unwrap();
+                    let signature_exn =
+                        SelfSigningPrefix::Ed25519Sha512(signer.sign(&serialized_exn).unwrap());
+                    let exn_index_signature =
+                        identifier.sign_with_index(signature_exn, 0).unwrap();
+                    (serialized_exn, exn_index_signature)
+                })
+                .collect();
+
             identifier
                 .finalize_group_event(
                     &multisig_event.encode().unwrap(),
-                    signature_ixn.clone(),
+                    signature_ixn,
                     signed_exchanges,
                 )
                 .await
@@ -189,6 +161,7 @@ async fn process_multisig_request(
     }
 }
 
+/// Issue a credential from a group identifier.
 pub async fn issue_group(
     group_identifier: &mut Identifier,
     participant_id: &IdentifierPrefix,
@@ -202,9 +175,15 @@ pub async fn issue_group(
         event_generator::exchange(group_identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
     let ixn_encoded = ixn.encode()?;
 
-    let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn_encoded)?);
+    let signature = SelfSigningPrefix::new(
+        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        km.sign(&ixn_encoded)?,
+    );
 
-    let exn_signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&exn)?);
+    let exn_signature = SelfSigningPrefix::new(
+        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        km.sign(&exn)?,
+    );
 
     let exn_index_signature = Signature::Transferable(
         SignerData::LastEstablishment(participant_id.clone()),

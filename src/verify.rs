@@ -2,11 +2,10 @@ use std::{sync::Arc, thread::sleep, time::Duration};
 
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_controller::{
-    communication::SendingError,
-    error::ControllerError,
-    identifier::{query::QueryResponse, Identifier},
-    IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix, TelState,
+use keri_controller::error::ControllerError;
+use keri_sdk::{
+    Identifier, IdentifierPrefix, LocationScheme, Oobi, QueryResponse,
+    SelfSigningPrefix, TelState,
 };
 use keri_core::{
     event::sections::seal::EventSeal,
@@ -36,8 +35,8 @@ pub enum VerifyHandleError {
     VerError(VerificationErrorWrapper),
     #[error("The message contains unexpected characters at the end.")]
     RemainingCESR(String),
-    #[error(transparent)]
-    SendingError(#[from] SendingError),
+    #[error("Sending error: {0}")]
+    SendingError(String),
     #[error("{0}")]
     List(ErrorList),
     #[error("Signature doesn't match provided data")]
@@ -112,15 +111,10 @@ pub async fn handle_verify(
     let oobis = parse_json_arguments::<Oobi>(oobi)
         .map_err(|e| VerifyHandleError::WrongOobiFormat(e.to_string()))?;
     for oobi in oobis {
-        match who_id.send_oobi_to_watcher(who_id.id(), &oobi).await {
-            Ok(_) => (),
-            Err(e) => match e {
-                ControllerError::SendingError(sending_error) => {
-                    return Err(sending_error.into());
-                }
-                _ => unreachable!(),
-            },
-        };
+        who_id
+            .send_oobi_to_watcher(who_id.id(), &oobi)
+            .await
+            .map_err(|e| VerifyHandleError::SendingError(e.to_string()))?;
     }
     let message = message.trim();
     let is_json = message.starts_with('{') || message.starts_with('[');
@@ -166,9 +160,9 @@ pub async fn handle_verify(
         };
     }
     if !attachments.is_empty() {
-        match who_id.known_events.verify_from_cesr(&message_bytes) {
+        match who_id.verify_from_cesr(&message_bytes) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
-            Err(ControllerError::VerificationError(e)) => {
+            Err(keri_sdk::Error::Controller(ControllerError::VerificationError(e))) => {
                 if e.iter().any(|(e, _)| {
                     if let VerificationError::VerificationFailure = e {
                         true
@@ -198,10 +192,12 @@ pub async fn handle_verify(
                 );
                 Err(VerifyHandleError::List(err_list))
             }
-            Err(ControllerError::CesrFormatError) => Err(VerifyHandleError::WrongSignatureFormat(
-                "Wrong format".to_string(),
-            )),
-            Err(_e) => todo!(),
+            Err(keri_sdk::Error::Controller(ControllerError::CesrFormatError)) => {
+                Err(VerifyHandleError::WrongSignatureFormat(
+                    "Wrong format".to_string(),
+                ))
+            }
+            Err(e) => Err(VerifyHandleError::OtherError(e.to_string())),
         }
     } else {
         let att: Attestation = match cesr.payload {

@@ -6,7 +6,7 @@ use std::{
 
 use acdc::attributes::InlineAttributes;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
+use keri_sdk::{Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
 use keri_core::{
     actor::{event_generator, prelude::SelfAddressingIdentifier},
     event_message::signature::{Signature, SignerData},
@@ -17,7 +17,7 @@ use keri_core::{
 use said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
 
 use crate::{
-    keri::{issue, query_tel, revoke},
+    keri,
     multisig::issue_group,
     resolve,
     said::SaidError,
@@ -67,7 +67,7 @@ pub async fn handle_issue(
         let signer = Arc::new(load_signer(alias)?);
         if id.registry_id().is_none() {
             // incept TEL if not incepted
-            crate::keri::incept_registry(&mut id, signer.clone()).await?;
+            keri::handle_incept_registry(&mut id, signer.clone()).await?;
             let registry_id = id.registry_id().as_ref().unwrap().to_string();
             save_registry(alias, &registry_id)?;
         };
@@ -82,7 +82,7 @@ pub async fn handle_issue(
 
         let said = attestation.digest.clone().unwrap();
 
-        issue(&mut id, said, signer).await?;
+        keri::handle_issue(&mut id, said, signer).await?;
         if oobi {
             match resolve::find_oobi(&id, &None) {
                 Ok(lcs) => {
@@ -225,7 +225,7 @@ pub fn extract_said(data: &str) -> Result<SelfAddressingIdentifier, CliError> {
 pub async fn handle_revoke(alias: &str, said: &SelfAddressingIdentifier) -> Result<(), CliError> {
     let mut id = load(alias)?;
     let signer = Arc::new(load_signer(alias)?);
-    revoke(&mut id, said, signer).await?;
+    keri::handle_revoke(&mut id, said, signer).await?;
     println!("Revoked {}", said);
 
     Ok(())
@@ -243,7 +243,7 @@ pub async fn handle_query(
     let registry_id: SelfAddressingIdentifier = registry_id.parse().unwrap();
 
     let signer = Arc::new(load_signer(alias)?);
-    query_tel(&said, registry_id, &issuer, &who_id, signer).await?;
+    keri::query_tel(&said, registry_id, &issuer, &who_id, signer).await?;
 
     match who_id.find_vc_state(&said) {
         Ok(Some(state)) => println!("{:?}", state),

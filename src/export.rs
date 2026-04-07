@@ -1,11 +1,15 @@
 use std::fs::create_dir_all;
 
-use keri_controller::config::ControllerConfig;
-use keri_controller::controller::Controller;
-use keri_controller::{identifier::Identifier, IdentifierPrefix, LocationScheme, SeedPrefix};
-use keri_controller::{CesrPrimitive, EndRole, Oobi};
-use keri_core::event::sections::seal::EventSeal;
-use keri_core::oobi::Role;
+use keri_controller::{
+    config::ControllerConfig,
+    controller::RedbController,
+    CesrPrimitive, EndRole, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
+};
+use keri_core::{
+    event::sections::seal::EventSeal,
+    oobi::Role,
+};
+use keri_sdk::Identifier;
 use serde::{Deserialize, Serialize};
 
 use crate::tel::save_registry;
@@ -77,12 +81,13 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
     db_path.push("db");
     create_dir_all(&db_path).map_err(ExportError::FileCreation)?;
 
-    let controller = Controller::new(ControllerConfig {
+    // Import uses low-level controller access for KEL/TEL processing.
+    let controller = RedbController::new(ControllerConfig {
         db_path,
         ..Default::default()
     })
     .unwrap();
-    let identifier = Identifier::new(
+    let identifier = keri_controller::controller::RedbIdentifier::new(
         imported.identifier.clone(),
         imported.registry_id.clone(),
         controller.known_events.clone(),

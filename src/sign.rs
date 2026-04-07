@@ -12,13 +12,13 @@ pub fn handle_sign(alias: String, data: &str) -> Result<String, CliError> {
     let cont = load(&alias)?;
     let sk = load_signer(&alias)?;
 
-    let signature = keri_controller::SelfSigningPrefix::Ed25519Sha512(
+    let signature = keri_sdk::SelfSigningPrefix::Ed25519Sha512(
         sk.sign(data)
             .map_err(|e| LoadingError::SignerError(e.to_string()))?,
     );
     Ok(cont
         .sign_to_cesr(data, &[signature])
-        .map_err(KeriError::ControllerError)?)
+        .map_err(|e| KeriError::Sdk(e))?)
 }
 
 pub fn handle_group_sign(alias: String, group_alias: &str, data: &str) -> Result<String, CliError> {
@@ -30,11 +30,11 @@ pub fn handle_group_sign(alias: String, group_alias: &str, data: &str) -> Result
 
     let sk = load_signer(&alias)?;
 
-    let signature = keri_controller::SelfSigningPrefix::Ed25519Sha512(
+    let signature = keri_sdk::SelfSigningPrefix::Ed25519Sha512(
         sk.sign(data)
             .map_err(|e| LoadingError::SignerError(e.to_string()))?,
     );
     Ok(cont
         .sign_to_cesr(data, &[signature])
-        .map_err(KeriError::ControllerError)?)
+        .map_err(|e| KeriError::Sdk(e))?)
 }

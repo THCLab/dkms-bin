@@ -1,5 +1,5 @@
 use config_file::ConfigFileError;
-use keri_controller::{identifier::query::WatcherResponseError, IdentifierPrefix};
+use keri_sdk::{WatcherResponseError, IdentifierPrefix};
 use thiserror::Error;
 
 use crate::{

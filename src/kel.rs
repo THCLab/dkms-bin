@@ -15,11 +15,8 @@ use figment::{
     providers::{Format, Yaml},
     Figment,
 };
-use keri_controller::{
-    identifier::{
-        query::{QueryResponse, WatcherResponseError},
-        Identifier,
-    },
+use keri_sdk::{
+    Identifier, QueryResponse, WatcherResponseError,
     BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
     SelfSigningPrefix,
 };
@@ -27,7 +24,7 @@ use keri_core::{actor::prelude::Message, signer::Signer};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    keri::rotate,
+    keri,
     utils::{load, load_next_signer, load_signer},
     CliError,
 };
@@ -125,7 +122,7 @@ pub async fn handle_rotate(alias: &str, config_path: Option<PathBuf>) -> Result<
     let next_bp = BasicPrefix::Ed25519NT(npk);
 
     // Rotate keys
-    rotate(
+    keri::handle_rotate(
         &mut id,
         current_signer,
         vec![next_bp],
@@ -182,17 +179,17 @@ pub async fn handle_get_identifier_kel(
         for oobi in parse_json_arguments::<Oobi>(&[&oobi])? {
             id.send_oobi_to_watcher(id.id(), &oobi)
                 .await
-                .map_err(KeriError::ControllerError)?;
+                .map_err(KeriError::Sdk)?;
         }
     };
 
     for watcher_id in id
         .watchers()
-        .map_err(super::keri::KeriError::ControllerError)?
+        .map_err(super::keri::KeriError::Sdk)?
     {
         let qry = id
             .query_full_log(identifier, watcher_id.clone())
-            .map_err(KeriError::ControllerError)?;
+            .map_err(KeriError::Sdk)?;
         let signature =
             SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
         let (mut qry_reps, mut errs) = id.finalize_query(vec![(qry, signature)]).await;

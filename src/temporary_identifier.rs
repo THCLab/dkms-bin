@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use keri_controller::{
-    communication::{Communication, SendingError},
+    communication::SendingError,
+    config::ControllerConfig,
+    controller::RedbController,
     error::ControllerError,
     identifier::nontransferable::NontransferableIdentifier,
-    known_events::KnownEvents,
     BasicPrefix, IdentifierPrefix, LocationScheme,
 };
 use keri_core::{
@@ -12,42 +13,44 @@ use keri_core::{
         error::ActorError, possible_response::PossibleResponse, prelude::Message, QueryError,
         SignedQueryError,
     },
-    processor::escrow::EscrowConfig,
+    database::redb::RedbDatabase,
+    oobi_manager::storage::RedbOobiStorage,
     signer::Signer,
-    transport::default::DefaultTransport,
 };
-use keri_controller::communication::HTTPTelTransport;
+use teliox::database::redb::RedbTelDatabase;
 use tempfile::Builder;
 
 use crate::export::ExportError;
 
+type RedbNontransferableId = NontransferableIdentifier<RedbDatabase, RedbTelDatabase, RedbOobiStorage>;
+
 pub struct TemporaryIdentifier {
     signer: Arc<Signer>,
-    id: NontransferableIdentifier,
+    id: RedbNontransferableId,
 }
 
 pub fn generate_temporary_identifier() -> Result<TemporaryIdentifier, ExportError> {
     // create temporary identifier to pull KEL from witnesses
     let signer = Arc::new(Signer::new());
     let bp = BasicPrefix::Ed25519NT(signer.public_key());
-    let transport = Box::new(DefaultTransport::new());
-    let tel_transport = Box::new(HTTPTelTransport);
+
     let tmp_dir = Builder::new()
         .prefix("tmp-dir")
         .tempdir()
         .map_err(|_e| ExportError::TemporaryId("Temporary file creation error".to_string()))?;
 
-    let tmp_events = Arc::new(
-        KnownEvents::new(tmp_dir.path().to_path_buf(), EscrowConfig::default()).map_err(|_e| {
-            ExportError::TemporaryId("Temporary identifier creation error".to_string())
-        })?,
-    );
-    let comm = Arc::new(Communication {
-        events: tmp_events.clone(),
-        transport,
-        tel_transport,
-    });
-    let tmp_id = NontransferableIdentifier::new(bp, comm.clone());
+    let mut db_path = tmp_dir.path().to_path_buf();
+    db_path.push("db");
+    std::fs::create_dir_all(&db_path)
+        .map_err(|_e| ExportError::TemporaryId("Temporary directory creation error".to_string()))?;
+
+    let controller = RedbController::new(ControllerConfig {
+        db_path,
+        ..Default::default()
+    })
+    .map_err(|_e| ExportError::TemporaryId("Temporary identifier creation error".to_string()))?;
+
+    let tmp_id = RedbNontransferableId::new(bp, controller.communication.clone());
     Ok(TemporaryIdentifier { signer, id: tmp_id })
 }
 

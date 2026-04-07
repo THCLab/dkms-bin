@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
+use keri_sdk::{Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
 
 use crate::{
     keri::KeriError,
@@ -25,11 +25,11 @@ pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), Identifier
         let _ = id_cont
             .resolve_oobi(&oobi)
             .await
-            .map_err(KeriError::MechanicsError);
+            .map_err(|e| KeriError::Sdk(e));
         id_cont
             .send_oobi_to_watcher(id_cont.id(), &oobi)
             .await
-            .map_err(KeriError::ControllerError)?;
+            .map_err(|e| KeriError::Sdk(e))?;
     }
     Ok(())
 }
@@ -38,7 +38,7 @@ pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), Identifier
 pub fn witnesses(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     Ok(identifier
         .find_state(identifier.id())
-        .map_err(KeriError::MechanicsError)?
+        .map_err(|e| KeriError::Sdk(e))?
         .witness_config
         .witnesses
         .into_iter()
@@ -48,7 +48,7 @@ pub fn witnesses(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliEr
 
 /// Returns watchers' identifiers of alias
 pub fn watcher(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
-    let watchers = identifier.watchers().map_err(KeriError::ControllerError)?;
+    let watchers = identifier.watchers().map_err(|e| KeriError::Sdk(e))?;
     Ok(watchers)
 }
 
@@ -57,7 +57,7 @@ pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliE
     let msgbox = identifeir
         // .source
         .get_end_role(identifeir.id(), keri_core::oobi::Role::Messagebox)
-        .map_err(KeriError::ControllerError)?
+        .map_err(|e| KeriError::Sdk(e))?
         .into_iter()
         .map(|b| b.eid)
         .collect();

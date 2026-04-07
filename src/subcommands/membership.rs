@@ -179,7 +179,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             let members = membership.get_members(group_alias.as_str());
 
             let witnesses_oobis = find_oobis_for_urls(witness_url).await.unwrap();
-            let group_id = group_incept(
+            match group_incept(
                 &mut initiator_id,
                 signer,
                 members,
@@ -189,13 +189,27 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 witness_threshold.unwrap(),
             )
             .await
-            .unwrap();
-            membership.save_group(&group_alias, &group_id.to_string());
-            println!(
-                "Group {} finalized. Requests sent to participants. Group id: {}",
-                group_alias,
-                group_id.to_string()
-            );
+            {
+                Ok(group_id) => {
+                    membership.save_group(&group_alias, &group_id.to_string());
+                    println!(
+                        "Group {} finalized. Requests sent to participants. Group id: {}",
+                        group_alias, group_id
+                    );
+                }
+                Err(crate::keri::KeriError::Sdk(keri_sdk::Error::Mechanics(
+                    keri_controller::identifier::mechanics::MechanicsError::UnknownIdentifierError(id),
+                ))) => {
+                    eprintln!(
+                        "Error: Unknown identifier {}. Have you resolved the OOBI for this member?\n\
+                         Use: dkms identifier oobi resolve -a {} -f <oobi.json>",
+                        id, alias
+                    );
+                }
+                Err(e) => {
+                    eprintln!("Error creating group: {}", e);
+                }
+            }
         }
         MembershipCommand::Accept {
             alias,
@@ -205,13 +219,36 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             let mut id = load(&alias).unwrap();
             let signer = Arc::new(load_signer(&alias).unwrap());
             let req = Requests::new(&alias).unwrap();
-            let group_id = accept(&mut id, req, signer, index).await;
+            let group_id = accept(&mut id, req, signer.clone(), index).await;
             match (group_alias, group_id) {
-                (Some(group_alias), Some(id)) => {
+                (Some(group_alias), Some(group_prefix)) => {
                     let membership = Membership::new(&alias);
-                    membership.save_group(&group_alias, &id.to_string());
+                    membership.save_group(&group_alias, &group_prefix.to_string());
+
+                    // Notify witnesses about our co-signature.
+                    if let Err(e) = id.notify_witnesses().await {
+                        eprintln!("Warning: failed to notify witnesses: {}", e);
+                    }
+
+                    // Sync to collect initiator's signature + witness receipts.
+                    if let Err(e) = pull_group_mailbox(&mut id, &group_prefix, signer.clone()).await {
+                        eprintln!("Warning: sync failed (run `membership pending --pull` to retry): {}", e);
+                    }
+
+                    println!("Group {} accepted: {}", group_alias, group_prefix);
                 }
-                _ => (),
+                (None, Some(group_prefix)) => {
+                    if let Err(e) = id.notify_witnesses().await {
+                        eprintln!("Warning: failed to notify witnesses: {}", e);
+                    }
+                    if let Err(e) = pull_group_mailbox(&mut id, &group_prefix, signer.clone()).await {
+                        eprintln!("Warning: sync failed: {}", e);
+                    }
+                    println!("Group accepted: {} (no alias saved — use -g to assign one)", group_prefix);
+                }
+                _ => {
+                    println!("No pending request at that index");
+                }
             };
         }
         MembershipCommand::Info { alias, group_alias } => {
@@ -223,10 +260,10 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 let cont = load_controller(alias.as_str()).unwrap();
                 let state = cont.find_state(&id);
                 match state {
-						                    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
-						                    Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
-						                    Err(e) => println!("Error: {:?}", e),
-					                    }
+                    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
+                    Err(keri_sdk::Error::Mechanics(keri_controller::identifier::mechanics::MechanicsError::UnknownIdentifierError(_id))) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
+                    Err(e) => println!("Error: {:?}", e),
+                }
             } else {
                 membership
                     .list_groups()
@@ -342,47 +379,38 @@ async fn watch_mailbox(
 }
 
 async fn pull_mailbox_helper(
-    mut identifier: &mut Identifier,
+    identifier: &mut Identifier,
     signer: Arc<Signer>,
     mem: &Membership,
     requests: &mut Requests,
 ) {
-    let bob_mailbox = pull_mailbox(&mut identifier, signer.clone()).await.unwrap();
-    for request in bob_mailbox {
-        let requested_event = match &request {
-            ActionRequired::MultisigRequest(ev, _exn) => ev,
-            ActionRequired::DelegationRequest(_ev, _exn) => todo!(),
-        };
-        let req_info = Requests::show_one(&requested_event);
-        let index = requests.add(request).unwrap();
-        if let Some(i) = index {
-            println!("New request: {}: {}", i, req_info);
+    // Poll for pending requests using the SDK's simplified API.
+    let pending = pull_mailbox(identifier, signer.clone()).await.unwrap();
+    for request in pending {
+        // Convert back to ActionRequired and store for deferred acceptance.
+        let action = request.into_action_required();
+        match requests.add(action) {
+            Ok(Some(idx)) => {
+                println!("New pending request stored:");
+                // Re-read from DB to display formatted info.
+                let all = requests.show().unwrap();
+                if let Some(line) = all.last() {
+                    println!("  {}", line);
+                }
+            }
+            Ok(None) => {} // duplicate, already stored
+            Err(e) => eprintln!("Failed to store request: {}", e),
         }
     }
+
+    // Synchronise group mailboxes (collect co-signatures and receipts).
     for group in mem.group_ids() {
-        let bob_group_mailbox = pull_group_mailbox(&mut identifier, &group, signer.clone())
-            .await
-            .unwrap();
-        for request in bob_group_mailbox {
-            let requested_event = match &request {
-                ActionRequired::MultisigRequest(ev, _exn) => ev,
-                ActionRequired::DelegationRequest(_ev, _exn) => todo!(),
-            };
-            let req_info = Requests::show_one(&requested_event);
-            let index = requests.add(request).unwrap();
-            if let Some(i) = index {
-                println!("New request: {}: {}", i, req_info);
-            }
-        }
+        let _ = pull_group_mailbox(identifier, &group, signer.clone()).await;
     }
 }
 
-use keri_controller::{
-    identifier::{mechanics::MechanicsError, Identifier},
-    mailbox_updating::ActionRequired,
-    IdentifierPrefix, Oobi,
-};
-use keri_core::signer::Signer;
+use keri_controller::identifier::mechanics::MechanicsError;
+use keri_sdk::{Identifier, IdentifierPrefix, Oobi, PendingRequest, Signer};
 use redb::{
     Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
 };

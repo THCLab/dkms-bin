@@ -10,15 +10,16 @@ use std::{
 use config_file::{ConfigFileError, FromConfigFile};
 use ed25519_dalek::SigningKey;
 
-use keri_controller::{
-    config::ControllerConfig, controller::Controller, identifier::Identifier, BasicPrefix,
-    LocationScheme, SeedPrefix,
+use keri_sdk::{
+    operations::create_identifier,
+    types::IdentifierConfig,
+    BasicPrefix, LocationScheme, Identifier, Signer,
 };
-use keri_core::signer::Signer;
+use keri_core::prefix::SeedPrefix;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    keri::{setup_identifier, KeriError},
+    keri::KeriError,
     subcommands::identifier::IdentifierSubcommandError,
     tel::remove_registry,
     utils::{save_identifier, save_next_seed, save_seed, working_directory, LoadingError},
@@ -205,47 +206,25 @@ pub(crate) async fn handle_new_id(
         .derive_key_pair()
         .map_err(|_e| CliError::KeysDerivationError)?;
 
-    let id = incept(
-        db_path.to_path_buf(),
-        keys.current.clone(),
-        keri_controller::BasicPrefix::Ed25519NT(npk),
-        kel_config.witness.unwrap_or_default(),
-        kel_config.witness_threshold,
-        None,
-        kel_config.watcher.unwrap_or_default(),
-    )
-    .await?;
-    Ok(id)
-}
+    let config = IdentifierConfig {
+        witnesses: kel_config.witness.unwrap_or_default(),
+        witness_threshold: kel_config.witness_threshold,
+        watchers: kel_config.watcher.unwrap_or_default(),
+    };
 
-async fn incept(
-    db_path: PathBuf,
-    priv_key: SeedPrefix,
-    next_key: BasicPrefix,
-    witness: Vec<LocationScheme>,
-    witness_threshold: u64,
-    messagebox: Option<LocationScheme>,
-    watcher: Vec<LocationScheme>,
-) -> Result<Identifier, KeriError> {
-    // Clear old identifier cache if exists
-    let mut query_cache_path = db_path.clone();
-    query_cache_path.push("query_cache");
-    let _ = std::fs::remove_file(&query_cache_path);
-    let cont = Arc::new(Controller::new(ControllerConfig {
-        db_path,
-        ..ControllerConfig::default()
-    })?);
-    let signer = Arc::new(Signer::new_with_seed(&priv_key)?);
-    let id = setup_identifier(
-        cont,
+    let signer = Arc::new(
+        Signer::new_with_seed(&keys.current)
+            .map_err(|_| CliError::KeysDerivationError)?,
+    );
+
+    let id = create_identifier(
+        db_path.to_path_buf(),
         signer,
-        next_key,
-        witness,
-        witness_threshold,
-        messagebox,
-        watcher,
+        BasicPrefix::Ed25519NT(npk),
+        config,
     )
-    .await?;
+    .await
+    .map_err(|e| CliError::KeriError(KeriError::Sdk(e)))?;
 
     Ok(id)
 }
