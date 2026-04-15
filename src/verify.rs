@@ -1,4 +1,6 @@
-use std::{sync::Arc, thread::sleep, time::Duration};
+use std::{sync::Arc, time::Duration};
+
+use tokio::time::sleep;
 
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -221,7 +223,7 @@ pub async fn handle_verify(
             if who_id.find_vc_state(&said).unwrap() != cached_state {
                 break;
             } else {
-                sleep(delay);
+                sleep(delay).await;
                 delay *= 2;
             }
         }
@@ -293,7 +295,7 @@ async fn query_with_retries(
             .finalize_query(vec![(qry.clone(), signature.clone())])
             .await;
         if qry_reps == QueryResponse::NoUpdates {
-            sleep(delay);
+            sleep(delay).await;
             delay *= 2;
         } else {
             break;
