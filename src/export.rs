@@ -1,14 +1,13 @@
 use std::fs::create_dir_all;
 
 use keri_controller::{
-    config::ControllerConfig,
-    controller::RedbController,
     CesrPrimitive, EndRole, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
 };
 use keri_core::{
     event::sections::seal::EventSeal,
     oobi::Role,
 };
+use keri_sdk::controller::Controller;
 use serde::{Deserialize, Serialize};
 
 use crate::tel::save_registry;
@@ -80,17 +79,10 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
     db_path.push("db");
     create_dir_all(&db_path).map_err(ExportError::FileCreation)?;
 
-    // Import uses low-level controller access for KEL/TEL processing.
-    let controller = RedbController::new(ControllerConfig {
-        db_path,
-        ..Default::default()
-    })
-    .unwrap();
-    let identifier = keri_controller::controller::RedbIdentifier::new(
+    let controller = Controller::new(db_path).unwrap();
+    let identifier = controller.load_identifier(
         imported.identifier.clone(),
         imported.registry_id.clone(),
-        controller.known_events.clone(),
-        controller.communication.clone(),
     );
 
     // Pull KEL from witnesses
@@ -109,7 +101,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
             .unwrap();
         if let Some(kel) = kel {
             for msg in kel {
-                controller.known_events.process(&msg).unwrap();
+                controller.process(&msg).unwrap();
             }
         } else {
             println!("Identifier {} KEL not found", &id);
@@ -119,9 +111,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         if let Some(registry_id) = &imported.registry_id {
             let tel_resp = tmp_id.pull_tel(registry_id, None, witness).await;
             controller
-                .known_events
-                .tel
-                .parse_and_process_tel_stream(tel_resp.as_bytes())
+                .process_tel_stream(tel_resp.as_bytes())
                 .unwrap();
         }
     }
