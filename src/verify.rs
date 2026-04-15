@@ -113,10 +113,25 @@ pub async fn handle_verify(
     let oobis = parse_json_arguments::<Oobi>(oobi)
         .map_err(|e| VerifyHandleError::WrongOobiFormat(e.to_string()))?;
     for oobi in oobis {
-        who_id
-            .send_oobi_to_watcher(who_id.id(), &oobi)
-            .await
-            .map_err(|e| VerifyHandleError::SendingError(e.to_string()))?;
+        let mut last_err = None;
+        let mut delay = Duration::from_secs(1);
+        for _attempt in 0..3 {
+            match who_id.send_oobi_to_watcher(who_id.id(), &oobi).await {
+                Ok(()) => {
+                    last_err = None;
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("Warning: failed to send OOBI to watcher, retrying: {}", e);
+                    last_err = Some(e);
+                    sleep(delay).await;
+                    delay *= 2;
+                }
+            }
+        }
+        if let Some(e) = last_err {
+            return Err(VerifyHandleError::SendingError(e.to_string()));
+        }
     }
     let message = message.trim();
     let is_json = message.starts_with('{') || message.starts_with('[');
