@@ -291,17 +291,21 @@ async fn query_with_retries(
 ) -> Result<(), VerifyHandleError> {
     let mut delay = Duration::from_secs(1);
     for _i in 0..5 {
-        let (qry_reps, _errs) = who_id
+        let (qry_reps, errs) = who_id
             .finalize_query(vec![(qry.clone(), signature.clone())])
             .await;
-        if qry_reps == QueryResponse::NoUpdates {
-            sleep(delay).await;
-            delay *= 2;
-        } else {
-            break;
+        if qry_reps != QueryResponse::NoUpdates {
+            return Ok(());
         }
+        if !errs.is_empty() {
+            eprintln!("Warning: watcher query errors: {:?}", errs);
+        }
+        sleep(delay).await;
+        delay *= 2;
     }
-    Ok(())
+    Err(VerifyHandleError::OtherError(
+        "Failed to retrieve key event log from watcher after retries".to_string(),
+    ))
 }
 
 fn find_oobis(who_id: &Identifier, issuer: &IdentifierPrefix) -> Vec<LocationScheme> {
