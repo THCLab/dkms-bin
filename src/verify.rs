@@ -6,7 +6,7 @@ use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use keri_sdk::{
     protocol::{
-        ControllerError, MoreInfoError, PublicKey, VerificationError,
+        ControllerError, MoreInfoError, VerificationError,
         get_signatures, SignerData,
     },
     EventSeal, Identifier, IdentifierPrefix, LocationScheme, Oobi, QueryEvent,
