@@ -6,15 +6,14 @@ use std::{
 
 use acdc::attributes::InlineAttributes;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_sdk::{Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
-use keri_core::{
-    actor::{event_generator, prelude::SelfAddressingIdentifier},
-    event_message::signature::{Signature, SignerData},
-    mailbox::exchange::ForwardTopic,
-    prefix::IndexedSignature,
-    signer::Signer,
+use keri_sdk::{
+    EndRole, Identifier, IdentifierPrefix, IndexedSignature, Oobi,
+    SelfAddressingIdentifier, SelfSigningPrefix, Signature, Signer,
+    protocol::{
+        event_generator, Encode, ForwardTopic, HashFunctionCode,
+        Role, SerializationFormats, SignerData,
+    },
 };
-use said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
 
 use crate::{
     keri,
@@ -137,12 +136,12 @@ pub async fn handle_group_registry_incept(
         let ixn_encoded = ixn.encode().unwrap();
 
         let signature = SelfSigningPrefix::new(
-            cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+            keri_sdk::protocol::SelfSigning::Ed25519Sha512,
             signer.sign(&ixn_encoded).unwrap(),
         );
 
         let exn_signature = SelfSigningPrefix::new(
-            cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+            keri_sdk::protocol::SelfSigning::Ed25519Sha512,
             signer.sign(&exn).unwrap(),
         );
 
@@ -262,7 +261,7 @@ pub fn handle_tel_oobi(alias: &str) -> Result<(), CliError> {
             .map(|wit_id| {
                 Oobi::EndRole(EndRole {
                     cid: registry_id.clone(),
-                    role: keri_core::oobi::Role::Witness,
+                    role: Role::Witness,
                     eid: IdentifierPrefix::Basic(wit_id),
                 })
             })

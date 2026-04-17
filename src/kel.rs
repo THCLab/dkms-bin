@@ -20,7 +20,7 @@ use keri_sdk::{
     BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
     SelfSigningPrefix,
 };
-use keri_core::{actor::prelude::Message, signer::Signer};
+use keri_sdk::{protocol::Message, Signer};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -77,7 +77,7 @@ pub async fn handle_kel_query(
                                 // check if identifier oobi is known
                                 let oobis = id
                                     .clone()
-                                    .get_end_role(identifier_prefix, keri_core::oobi::Role::Witness)
+                                    .get_end_role(identifier_prefix, keri_sdk::protocol::Role::Witness)
                                     .unwrap();
                                 if oobis.is_empty() {
                                     VerifyHandleError::MissingOobi(identifier_prefix.clone())

@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use said::SelfAddressingIdentifier;
+use keri_sdk::SelfAddressingIdentifier;
 use std::{str::FromStr, sync::Arc, thread::sleep, time::Duration};
 
 #[derive(Subcommand)]
@@ -198,7 +198,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                     );
                 }
                 Err(crate::keri::KeriError::Sdk(keri_sdk::Error::Mechanics(
-                    keri_controller::identifier::mechanics::MechanicsError::UnknownIdentifierError(id),
+                    keri_sdk::protocol::MechanicsError::UnknownIdentifierError(id),
                 ))) => {
                     eprintln!(
                         "Error: Unknown identifier {}. Have you resolved the OOBI for this member?\n\
@@ -261,7 +261,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 let state = cont.find_state(&id);
                 match state {
                     Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
-                    Err(keri_sdk::Error::Mechanics(keri_controller::identifier::mechanics::MechanicsError::UnknownIdentifierError(_id))) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
+                    Err(keri_sdk::Error::Mechanics(keri_sdk::protocol::MechanicsError::UnknownIdentifierError(_id))) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
                     Err(e) => println!("Error: {:?}", e),
                 }
             } else {

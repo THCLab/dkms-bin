@@ -15,7 +15,7 @@ use keri_sdk::{
     types::IdentifierConfig,
     BasicPrefix, LocationScheme, Identifier, Signer,
 };
-use keri_core::prefix::SeedPrefix;
+use keri_sdk::SeedPrefix;
 use serde::{Deserialize, Serialize};
 
 use crate::{

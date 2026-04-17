@@ -1,6 +1,6 @@
-use keri_controller::mailbox_updating::ActionRequired;
+use keri_sdk::ActionRequired;
 use keri_sdk::CesrPrimitive;
-use said::SelfAddressingIdentifier;
+use keri_sdk::SelfAddressingIdentifier;
 use std::{
     fs::{self, File},
     io::Write,
@@ -11,12 +11,9 @@ use anyhow::Result;
 use keri_sdk::{
     Controller, Identifier, IdentifierPrefix, LocationScheme,
 };
-use keri_core::{
-    event::KeyEvent,
-    event_message::msg::KeriEvent,
-    mailbox::exchange::{Exchange, ExchangeMessage},
-    prefix::SeedPrefix,
-    signer::Signer,
+use keri_sdk::{
+    SeedPrefix, Signer,
+    protocol::{KeyEvent, KeriEvent, Exchange, ExchangeMessage},
 };
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
@@ -35,13 +32,13 @@ pub enum LoadingError {
     #[error("Parsing error: {0}")]
     ParsingError(String),
     #[error("Controller error: {0}")]
-    ControllerError(#[from] keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_sdk::protocol::ControllerError),
     #[error("Signer error: {0}")]
     SignerError(String),
     #[error("Can't load home path")]
     HomePath,
     #[error(transparent)]
-    Mechanics(#[from] keri_controller::identifier::mechanics::MechanicsError),
+    Mechanics(#[from] keri_sdk::protocol::MechanicsError),
     #[error(transparent)]
     Sdk(#[from] keri_sdk::Error),
 }
@@ -241,8 +238,8 @@ pub fn collect_witness_data(
     );
     let witness_threshold = state.witness_config.tally;
     let witness_threshold = match witness_threshold {
-        keri_core::event::sections::threshold::SignatureThreshold::Simple(i) => i,
-        keri_core::event::sections::threshold::SignatureThreshold::Weighted(
+        keri_sdk::protocol::SignatureThreshold::Simple(i) => i,
+        keri_sdk::protocol::SignatureThreshold::Weighted(
             _weighted_threshold,
         ) => {
             todo!()
@@ -252,7 +249,7 @@ pub fn collect_witness_data(
 }
 
 pub fn collect_watchers_data(identifier: &Identifier) -> Result<Vec<LocationScheme>, LoadingError> {
-    let watchers = identifier.get_role_location(identifier.id(), keri_core::oobi::Role::Watcher)?;
+    let watchers = identifier.get_role_location(identifier.id(), keri_sdk::protocol::Role::Watcher)?;
     Ok(watchers)
 }
 
@@ -474,7 +471,7 @@ impl Requests {
     }
 
     pub fn show_one(index: u8, event: &KeriEvent<KeyEvent>) -> String {
-        use keri_core::event::event_data::EventData;
+        use keri_sdk::protocol::EventData;
         let prefix = event.data.get_prefix();
         let event_type = match &event.data.event_data {
             EventData::Icp(icp) => {

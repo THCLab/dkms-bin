@@ -5,20 +5,20 @@ use keri_sdk::{
     BasicPrefix, IdentifierPrefix, LocationScheme, SelfSigningPrefix,
     Identifier, Signer,
 };
-use keri_core::actor::prelude::SelfAddressingIdentifier;
+use keri_sdk::SelfAddressingIdentifier;
 use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum KeriError {
     #[error(transparent)]
-    ControllerError(#[from] keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_sdk::protocol::ControllerError),
     #[error(transparent)]
-    MechanicsError(#[from] keri_controller::identifier::mechanics::MechanicsError),
+    MechanicsError(#[from] keri_sdk::protocol::MechanicsError),
     #[error(transparent)]
-    Keri(#[from] keri_core::error::Error),
+    Keri(#[from] keri_sdk::protocol::CoreError),
     #[error(transparent)]
-    SigningError(#[from] keri_core::keys::KeysError),
+    SigningError(#[from] keri_sdk::protocol::KeysError),
     #[error(transparent)]
     Sdk(#[from] keri_sdk::Error),
 }
@@ -50,7 +50,7 @@ pub async fn query_tel(
         IdentifierPrefix::self_addressing(acdc_d.clone()),
     )?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::protocol::SelfSigning::Ed25519Sha512,
         km.sign(qry.encode()?)?,
     );
 

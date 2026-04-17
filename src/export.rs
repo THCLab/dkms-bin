@@ -1,11 +1,8 @@
 use std::fs::create_dir_all;
 
-use keri_controller::{
-    CesrPrimitive, EndRole, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
-};
-use keri_core::{
-    event::sections::seal::EventSeal,
-    oobi::Role,
+use keri_sdk::{
+    protocol::Role,
+    CesrPrimitive, EndRole, EventSeal, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
 };
 use keri_sdk::controller::Controller;
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,7 @@
 use std::io::{self, IsTerminal, Read};
 
 use clap::Subcommand;
-use said::derivation::{HashFunction, HashFunctionCode};
+use keri_sdk::protocol::{HashFunction, HashFunctionCode};
 
 use crate::{said::handle_sad, CliError};
 

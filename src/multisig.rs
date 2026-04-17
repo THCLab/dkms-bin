@@ -8,17 +8,13 @@ use keri_sdk::{
     Identifier, IdentifierPrefix, LocationScheme, SelfSigningPrefix,
     Signer,
 };
-use keri_core::{
-    actor::event_generator,
-    event::KeyEvent,
-    event_message::{
-        msg::KeriEvent,
-        signature::{Signature, SignerData},
+use keri_sdk::{
+    IndexedSignature, Signature,
+    protocol::{
+        event_generator, KeyEvent, KeriEvent, SignerData, ForwardTopic,
     },
-    mailbox::exchange::ForwardTopic,
-    prefix::IndexedSignature,
 };
-use said::SelfAddressingIdentifier;
+use keri_sdk::SelfAddressingIdentifier;
 
 use crate::{error::CliError, keri::KeriError, utils::Requests};
 
@@ -105,9 +101,9 @@ async fn process_multisig_request(
     identifier: &mut Identifier,
     signer: Arc<Signer>,
     multisig_event: KeriEvent<KeyEvent>,
-    exchanges: Vec<keri_core::mailbox::exchange::ExchangeMessage>,
+    exchanges: Vec<keri_sdk::protocol::ExchangeMessage>,
 ) -> Result<Option<IdentifierPrefix>, CliError> {
-    use keri_core::event_message::EventTypeTag;
+    use keri_sdk::protocol::EventTypeTag;
     use keri_sdk::ActionRequired;
 
     println!(
@@ -176,12 +172,12 @@ pub async fn issue_group(
     let ixn_encoded = ixn.encode()?;
 
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::protocol::SelfSigning::Ed25519Sha512,
         km.sign(&ixn_encoded)?,
     );
 
     let exn_signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::protocol::SelfSigning::Ed25519Sha512,
         km.sign(&exn)?,
     );
 
