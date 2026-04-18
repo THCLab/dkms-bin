@@ -2,6 +2,15 @@ use keri_sdk::protocol::SeedCode;
 use ed25519_dalek::SigningKey;
 use keri_sdk::{CesrPrimitive, SeedPrefix};
 
+pub fn generate_ed25519_seeds() -> (SeedPrefix, SeedPrefix) {
+    let current = SigningKey::generate(&mut rand::rngs::OsRng);
+    let next = SigningKey::generate(&mut rand::rngs::OsRng);
+    (
+        SeedPrefix::new(SeedCode::RandomSeed256Ed25519, current.as_bytes().to_vec()),
+        SeedPrefix::new(SeedCode::RandomSeed256Ed25519, next.as_bytes().to_vec()),
+    )
+}
+
 pub fn generate_seed() -> String {
     let sk = SigningKey::generate(&mut rand::rngs::OsRng);
     let seed = SeedPrefix::RandomSeed256Ed25519(sk.as_bytes().to_vec());

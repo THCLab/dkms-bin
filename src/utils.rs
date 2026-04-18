@@ -296,6 +296,8 @@ pub enum RequestError {
     IO(#[from] std::io::Error),
     #[error(transparent)]
     Loading(#[from] LoadingError),
+    #[error("Encoding error: {0}")]
+    EncodingError(String),
 }
 
 /// Storage for requests from other participants
@@ -465,7 +467,35 @@ impl Requests {
                     return Ok(None);
                 }
             }
-            ActionRequired::DelegationRequest(_typed_event, _typed_event1) => todo!(),
+            ActionRequired::DelegationRequest(typed_event, exchange) => {
+                let said = typed_event.data.get_prefix();
+                let event_bytes = typed_event
+                    .encode()
+                    .map_err(|e| RequestError::EncodingError(e.to_string()))?;
+                let write_txn = self.db.begin_write()?;
+                if write_txn
+                    .open_table(INDEX)?
+                    .get(self.index)?
+                    .is_none()
+                {
+                    {
+                        let mut table = write_txn.open_table(INDEX)?;
+                        table.insert(self.index, said.to_string().as_str())?;
+                        self.index += 1;
+                        let mut events_table = write_txn.open_table(EVENTS)?;
+                        events_table.insert(said.to_string().as_str(), event_bytes.as_slice())?;
+                        let mut exchanges_table =
+                            write_txn.open_multimap_table(EXCHANGES)?;
+                        exchanges_table.insert(
+                            said.to_string().as_str(),
+                            serde_json::to_vec(&exchange).unwrap().as_slice(),
+                        )?;
+                    }
+                    write_txn.commit()?;
+                } else {
+                    return Ok(None);
+                }
+            }
         };
         Ok(Some(self.index - 1))
     }

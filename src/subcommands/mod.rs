@@ -1,5 +1,6 @@
 pub mod data;
 pub mod debug;
+pub mod delegation;
 pub mod identifier;
 pub mod key;
 pub mod log;

@@ -3,6 +3,7 @@ use error::CliError;
 use subcommands::{
     data::{process_data_command, DataCommand},
     debug::{process_debug_command, DebugCommand},
+    delegation::{process_delegation_command, DelegationCommand},
     identifier::{process_identifier_command, IdentifierCommand},
     key::{process_key_command, KeyCommands},
     log::{process_log_command, LogCommand},
@@ -84,6 +85,11 @@ enum Commands {
         #[command(subcommand)]
         command: MembershipCommand,
     },
+    /// Manage delegated identifiers
+    Delegation {
+        #[command(subcommand)]
+        command: DelegationCommand,
+    },
 }
 
 #[tokio::main]
@@ -136,6 +142,7 @@ async fn process_command(command: Commands) -> Result<(), CliError> {
         }
         Commands::Debug { command } => process_debug_command(command).await,
         Commands::Membership { command } => process_membership_command(command).await,
+        Commands::Delegation { command } => process_delegation_command(command).await,
     };
     Ok(())
 }
