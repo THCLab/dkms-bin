@@ -4,15 +4,15 @@ use std::{
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use anyhow::Result;
 use keri_sdk::keri_controller::{
     config::ControllerConfig,
-    RedbController as Controller,
-    identifier::mechanics::MechanicsError, RedbIdentifier as Identifier,
-    IdentifierPrefix, LocationScheme, SeedPrefix,
+    identifier::mechanics::MechanicsError,
+    IdentifierPrefix, LocationScheme, RedbController as Controller,
+    RedbIdentifier as Identifier, SeedPrefix, SelfSigningPrefix,
 };
 use keri_sdk::keri_core::{
     event::KeyEvent,
@@ -20,6 +20,7 @@ use keri_sdk::keri_core::{
     mailbox::exchange::{Exchange, ExchangeMessage},
     signer::Signer,
 };
+use keri_sdk::store::KeriStore;
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
 use thiserror::Error;
@@ -50,6 +51,35 @@ pub fn working_directory() -> Result<PathBuf, LoadingError> {
     let mut working_directory = load_homedir()?;
     working_directory.push(".dkms-dev-cli");
     Ok(working_directory)
+}
+
+static STORE: OnceLock<KeriStore> = OnceLock::new();
+
+/// Shared `KeriStore` rooted at the CLI working directory. The on-disk layout
+/// matches what the legacy load/save helpers produce, so the two can coexist
+/// during the Phase B migration. Callers that want the SDK's high-level
+/// persistence (alias rotation, multisig metadata, delegation) should go
+/// through this instead of the file-by-file helpers in this module.
+#[allow(dead_code)]
+pub fn keri_store() -> Result<&'static KeriStore, LoadingError> {
+    if let Some(s) = STORE.get() {
+        return Ok(s);
+    }
+    let root = working_directory()?;
+    let store = KeriStore::open(root)
+        .map_err(|e| LoadingError::SignerError(format!("store open: {e}")))?;
+    Ok(STORE.get_or_init(|| store))
+}
+
+/// Wrap raw Ed25519 bytes produced by `signer.sign(...)` into the CESR
+/// `SelfSigningPrefix` that `sign_to_cesr` and friends expect. Returns the
+/// raw `KeysError` so callers that already have `#[from] KeysError` variants
+/// can propagate transparently.
+pub fn ed25519_sig(
+    signer: &Signer,
+    data: &[u8],
+) -> Result<SelfSigningPrefix, keri_sdk::keri_core::keys::KeysError> {
+    Ok(SelfSigningPrefix::Ed25519Sha512(signer.sign(data)?))
 }
 
 pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
@@ -147,13 +177,7 @@ pub fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
 }
 
 pub fn load_seed(alias: &str) -> Result<SeedPrefix, LoadingError> {
-    let mut path = working_directory()?;
-    path.push(alias);
-    path.push("priv_key");
-    let sk_str = fs::read_to_string(path)?;
-    sk_str
-        .parse()
-        .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))
+    read_seed_file(alias, "priv_key")
 }
 
 pub fn save_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Error> {
@@ -166,13 +190,17 @@ pub fn save_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Error> {
 }
 
 pub fn load_next_seed(alias: &str) -> Result<SeedPrefix, LoadingError> {
+    read_seed_file(alias, "next_priv_key")
+}
+
+fn read_seed_file(alias: &str, filename: &str) -> Result<SeedPrefix, LoadingError> {
+    use std::str::FromStr;
     let mut path = working_directory()?;
     path.push(alias);
-    path.push("next_priv_key");
+    path.push(filename);
     let sk_str = fs::read_to_string(path)?;
-    sk_str
-        .parse()
-        .map_err(|_e| LoadingError::SignerError("Seed parsing error".to_string()))
+    SeedPrefix::from_str(sk_str.trim())
+        .map_err(|_e| LoadingError::SignerError(format!("{filename} parsing error")))
 }
 
 pub fn save_next_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Error> {
@@ -185,19 +213,17 @@ pub fn save_next_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Err
 }
 
 pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
-    let seed: SeedPrefix = load_seed(alias)?;
-    let signer =
-        Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))?;
-
-    Ok(signer)
+    // Thin wrapper: KeriStore's load_signer returns Arc<Signer>, but the
+    // many call sites in dkms-bin still expect an owned Signer. Building a
+    // new one from the persisted seed keeps the signature stable. Once all
+    // callers move to Arc, swap this for `keri_store()?.load_signer(alias)`.
+    let seed = load_seed(alias)?;
+    Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))
 }
 
 pub fn load_next_signer(alias: &str) -> Result<Signer, LoadingError> {
     let seed = load_next_seed(alias)?;
-    let signer =
-        Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))?;
-
-    Ok(signer)
+    Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))
 }
 
 pub fn handle_info(alias: &str) -> Result<(), LoadingError> {

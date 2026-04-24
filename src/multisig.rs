@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning;
 use keri_sdk::keri_controller::{
-    RedbIdentifier as Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
-    Oobi, SelfSigningPrefix,
+    mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme, Oobi,
+    RedbIdentifier as Identifier,
 };
 use keri_sdk::keri_core::{
     actor::event_generator,
@@ -57,10 +56,8 @@ pub async fn group_incept(
         None,
     )?;
 
-    let signature_icp =
-        SelfSigningPrefix::Ed25519Sha512(initiator_signer.sign(group_inception.as_bytes())?);
-    let signature_exn =
-        SelfSigningPrefix::Ed25519Sha512(initiator_signer.sign(exn_messages[0].as_bytes())?);
+    let signature_icp = crate::utils::ed25519_sig(&initiator_signer, group_inception.as_bytes())?;
+    let signature_exn = crate::utils::ed25519_sig(&initiator_signer, exn_messages[0].as_bytes())?;
 
     let exn_index_signature = initiator_id.sign_with_index(signature_exn, 0)?;
 
@@ -88,8 +85,7 @@ pub async fn pull_mailbox(
 
     let mut out = Vec::new();
     for qry in query {
-        let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.clone().sign(&qry.encode().unwrap()).unwrap());
+        let signature = crate::utils::ed25519_sig(&signer, &qry.encode().unwrap()).unwrap();
         let mut action_required = identifier
             .finalize_query_mailbox(vec![(qry, signature)])
             .await
@@ -113,8 +109,7 @@ pub async fn pull_group_mailbox(
 
     let mut out = Vec::new();
     for qry in query {
-        let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.clone().sign(&qry.encode().unwrap()).unwrap());
+        let signature = crate::utils::ed25519_sig(&signer, &qry.encode().unwrap()).unwrap();
         let mut action_required = identifier
             .finalize_query_mailbox(vec![(qry, signature)])
             .await
@@ -150,14 +145,13 @@ async fn process_multisig_request(
         String::from_utf8(multisig_event.encode().unwrap()).unwrap()
     );
     let signature_ixn =
-        SelfSigningPrefix::Ed25519Sha512(signer.sign(&multisig_event.encode().unwrap()).unwrap());
+        crate::utils::ed25519_sig(&signer, &multisig_event.encode().unwrap()).unwrap();
 
     let signed_exchanges = exchanges
         .into_iter()
         .map(|exn| {
             let serialized_exn = exn.encode().unwrap();
-            let signature_exn =
-                SelfSigningPrefix::Ed25519Sha512(signer.sign(&serialized_exn).unwrap());
+            let signature_exn = crate::utils::ed25519_sig(&signer, &serialized_exn).unwrap();
 
             let exn_index_signature = identifier.sign_with_index(signature_exn, 0).unwrap();
             (serialized_exn, exn_index_signature)
@@ -202,9 +196,8 @@ pub async fn issue_group(
         event_generator::exchange(group_identifier.id(), &ixn, ForwardTopic::Multisig).encode()?;
     let ixn_encoded = ixn.encode()?;
 
-    let signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&ixn_encoded)?);
-
-    let exn_signature = SelfSigningPrefix::new(SelfSigning::Ed25519Sha512, km.sign(&exn)?);
+    let signature = crate::utils::ed25519_sig(&km, &ixn_encoded)?;
+    let exn_signature = crate::utils::ed25519_sig(&km, &exn)?;
 
     let exn_index_signature = Signature::Transferable(
         SignerData::LastEstablishment(participant_id.clone()),

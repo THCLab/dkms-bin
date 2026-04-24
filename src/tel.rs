@@ -6,7 +6,7 @@ use std::{
 
 use acdc::attributes::InlineAttributes;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_sdk::keri_controller::{RedbIdentifier as Identifier, EndRole, IdentifierPrefix, Oobi, SelfSigningPrefix};
+use keri_sdk::keri_controller::{EndRole, IdentifierPrefix, Oobi, RedbIdentifier as Identifier};
 use keri_sdk::keri_core::{
     actor::{event_generator, prelude::SelfAddressingIdentifier},
     event_message::signature::{Signature, SignerData},
@@ -136,15 +136,8 @@ pub async fn handle_group_registry_incept(
             .unwrap();
         let ixn_encoded = ixn.encode().unwrap();
 
-        let signature = SelfSigningPrefix::new(
-            keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-            signer.sign(&ixn_encoded).unwrap(),
-        );
-
-        let exn_signature = SelfSigningPrefix::new(
-            keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-            signer.sign(&exn).unwrap(),
-        );
+        let signature = crate::utils::ed25519_sig(&signer, &ixn_encoded).unwrap();
+        let exn_signature = crate::utils::ed25519_sig(&signer, &exn).unwrap();
 
         let exn_index_signature = Signature::Transferable(
             SignerData::LastEstablishment(participant_id.clone()),

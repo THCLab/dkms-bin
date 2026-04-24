@@ -1,3 +1,18 @@
+## [Unreleased] - Phase B progress
+
+### 🔧 Changed
+
+- Introduced `utils::ed25519_sig` helper and replaced ~27 repeated
+  `SelfSigningPrefix::Ed25519Sha512(signer.sign(..).unwrap())` call sites
+  across `sign.rs`, `mesagkesto.rs`, `keri.rs`, `kel.rs`, `verify.rs`,
+  `multisig.rs`, and `tel.rs` — removes per-file reaches into
+  `keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning`.
+- Added a lazily-initialised `KeriStore` singleton in `utils::keri_store()`
+  as the foundation for the next Phase B pass (migrating persistence and
+  `load()` to the SDK's high-level API).
+- Cleaned up now-unused `SelfSigningPrefix` / `SelfSigning` imports across
+  the touched files.
+
 ## [0.9.0] - 2026-04-24
 
 ### 🔧 Changed

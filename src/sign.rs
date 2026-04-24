@@ -1,6 +1,6 @@
 use crate::{
     keri::KeriError,
-    utils::{load, load_group_id, load_signer, LoadingError},
+    utils::{ed25519_sig, load, load_group_id, load_signer},
     CliError,
 };
 
@@ -12,10 +12,7 @@ pub fn handle_sign(alias: String, data: &str) -> Result<String, CliError> {
     let cont = load(&alias)?;
     let sk = load_signer(&alias)?;
 
-    let signature = keri_sdk::keri_controller::SelfSigningPrefix::Ed25519Sha512(
-        sk.sign(data)
-            .map_err(|e| LoadingError::SignerError(e.to_string()))?,
-    );
+    let signature = ed25519_sig(&sk, data.as_bytes()).map_err(KeriError::SigningError)?;
     Ok(cont
         .sign_to_cesr(data, &[signature])
         .map_err(KeriError::ControllerError)?)
@@ -30,10 +27,7 @@ pub fn handle_group_sign(alias: String, group_alias: &str, data: &str) -> Result
 
     let sk = load_signer(&alias)?;
 
-    let signature = keri_sdk::keri_controller::SelfSigningPrefix::Ed25519Sha512(
-        sk.sign(data)
-            .map_err(|e| LoadingError::SignerError(e.to_string()))?,
-    );
+    let signature = ed25519_sig(&sk, data.as_bytes()).map_err(KeriError::SigningError)?;
     Ok(cont
         .sign_to_cesr(data, &[signature])
         .map_err(KeriError::ControllerError)?)

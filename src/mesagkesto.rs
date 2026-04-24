@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    utils::{load, load_identifier, load_signer},
+    utils::{ed25519_sig, load, load_identifier, load_signer},
     CliError,
 };
 
@@ -20,11 +20,8 @@ pub fn handle_exchange(alias: &str, data: &str, receiver_alias: &str) -> Result<
     let signer_id = load(alias)?;
     let signer = load_signer(alias)?;
 
-    let signature = keri_sdk::keri_controller::SelfSigningPrefix::Ed25519Sha512(
-        signer
-            .sign(exn.to_string().as_bytes())
-            .map_err(|_e| MesagkestoError::SigningError)?,
-    );
+    let signature = ed25519_sig(&signer, exn.to_string().as_bytes())
+        .map_err(|_| MesagkestoError::SigningError)?;
     Ok(signer_id
         .sign_to_cesr(&exn.to_string(), &[signature])
         .map_err(|_e| MesagkestoError::SigningError)?)
@@ -38,11 +35,8 @@ pub fn handle_pull(alias: &str) -> Result<String, CliError> {
 
     let qry = messagebox::query_by_sn(signer_id.id().to_string(), 0);
 
-    let signature = keri_sdk::keri_controller::SelfSigningPrefix::Ed25519Sha512(
-        signer
-            .sign(qry.to_string().as_bytes())
-            .map_err(|_e| MesagkestoError::SigningError)?,
-    );
+    let signature = ed25519_sig(&signer, qry.to_string().as_bytes())
+        .map_err(|_| MesagkestoError::SigningError)?;
     Ok(signer_id
         .sign_to_cesr(&qry.to_string(), &[signature])
         .map_err(|_e| MesagkestoError::SigningError)?)

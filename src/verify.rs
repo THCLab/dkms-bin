@@ -282,7 +282,7 @@ async fn update_kel(
             .query_full_log(about_who, watcher)
             .map_err(|e| VerifyHandleError::OtherError(e.to_string()))?;
         let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
+            crate::utils::ed25519_sig(&signer, &qry.encode().unwrap()).unwrap();
         query_with_retries(who_id, qry, signature).await?;
     }
 
@@ -298,7 +298,7 @@ async fn update_kel_with_seal(
         load_signer(alias).map_err(|_| VerifyHandleError::UnknownIdentifier(alias.to_string()))?;
     for query in who_id.query_watchers(event_seal).unwrap() {
         let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.sign(query.encode().unwrap()).unwrap());
+            crate::utils::ed25519_sig(&signer, &query.encode().unwrap()).unwrap();
         query_with_retries(who_id, query, signature).await?;
     }
 

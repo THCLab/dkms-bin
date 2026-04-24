@@ -18,7 +18,7 @@ use figment::{
 use keri_sdk::keri_controller::{
     identifier::query::{QueryResponse, WatcherResponseError},
     BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, RedbIdentifier as Identifier,
-    SeedPrefix, SelfSigningPrefix,
+    SeedPrefix,
 };
 use keri_sdk::keri_core::{actor::prelude::Message, signer::Signer};
 use serde::{Deserialize, Serialize};
@@ -191,7 +191,7 @@ pub async fn handle_get_identifier_kel(
             .query_full_log(identifier, watcher_id.clone())
             .map_err(KeriError::ControllerError)?;
         let signature =
-            SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
+            crate::utils::ed25519_sig(&signer, &qry.encode().unwrap()).unwrap();
         let (mut qry_reps, mut errs) = id.finalize_query(vec![(qry, signature)]).await;
         let mut loop_count = 0;
         while let QueryResponse::NoUpdates = qry_reps {
@@ -200,7 +200,7 @@ pub async fn handle_get_identifier_kel(
             };
             let qry = id.query_full_log(identifier, watcher_id.clone()).unwrap();
             let signature =
-                SelfSigningPrefix::Ed25519Sha512(signer.sign(qry.encode().unwrap()).unwrap());
+                crate::utils::ed25519_sig(&signer, &qry.encode().unwrap()).unwrap();
             let (qry_resp, new_errs) = id.finalize_query(vec![(qry, signature)]).await;
             errs = new_errs;
             qry_reps = qry_resp;

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use controller::{
-    RedbController as Controller, BasicPrefix, IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix,
+    BasicPrefix, IdentifierPrefix, LocationScheme, Oobi, RedbController as Controller,
 };
 use keri_sdk::keri_controller::{
     self as controller,
@@ -33,10 +33,7 @@ pub async fn add_watcher(
     id.resolve_oobi(&Oobi::Location(watcher_oobi.clone()))
         .await?;
     let rpy = id.add_watcher(watcher_oobi.eid.clone())?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        km.sign(rpy.as_bytes())?,
-    );
+    let signature = crate::utils::ed25519_sig(&km, rpy.as_bytes())?;
     id.finalize_add_watcher(rpy.as_bytes(), signature).await?;
     Ok(())
 }
@@ -72,10 +69,7 @@ pub async fn setup_identifier(
     let signing_inception = cont
         .incept(pks, npks, witness.clone(), witness_threshold)
         .await?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        signer.sign(signing_inception.as_bytes())?,
-    );
+    let signature = crate::utils::ed25519_sig(&signer, signing_inception.as_bytes())?;
     let mut signing_identifier = cont.finalize_incept(signing_inception.as_bytes(), &signature)?;
 
     // let mut signing_identifier = Identifier::new(signing_identifier.clone(), cont.clone(), None);
@@ -116,10 +110,7 @@ pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result
     // Init tel
     let (_reg_id, ixn) = id.incept_registry()?;
     let encoded_ixn = ixn.encode()?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        signer.sign(&encoded_ixn)?,
-    );
+    let signature = crate::utils::ed25519_sig(&signer, &encoded_ixn)?;
     id.finalize_anchor(&encoded_ixn, signature).await?;
 
     id.notify_witnesses().await?;
@@ -155,7 +146,7 @@ pub async fn query_mailbox(
         .query_mailbox(id.id(), &[witness_id.clone()])?
         .into_iter()
     {
-        let signature = SelfSigningPrefix::Ed25519Sha512(km.sign(&qry.encode()?)?);
+        let signature = crate::utils::ed25519_sig(&km, &qry.encode()?)?;
         let signatures = vec![IndexedSignature::new_both_same(signature.clone(), 0)];
         let signed_qry = SignedMailboxQuery::new_trans(qry.clone(), id.id().clone(), signatures);
         id.finalize_query_mailbox(vec![(qry, signature)]).await?;
@@ -197,10 +188,7 @@ pub async fn query_tel(
         IdentifierPrefix::self_addressing(registry_id),
         IdentifierPrefix::self_addressing(acdc_d.clone()),
     )?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        km.sign(qry.encode()?)?,
-    );
+    let signature = crate::utils::ed25519_sig(&km, &qry.encode()?)?;
 
     id.finalize_query_tel(qry, signature).await?;
     Ok(())
@@ -243,10 +231,7 @@ pub async fn rotate(
             witness_threshold,
         )
         .await?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        current_signer.sign(rotation.as_bytes())?,
-    );
+    let signature = crate::utils::ed25519_sig(&current_signer, rotation.as_bytes())?;
     id.finalize_rotate(rotation.as_bytes(), signature).await?;
 
     id.notify_witnesses().await?;
@@ -268,10 +253,7 @@ pub async fn issue(
 ) -> Result<(), KeriError> {
     let (vc_id, ixn) = identifier.issue(cred_said.clone())?;
     let ixn = ixn.encode()?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        km.sign(&ixn)?,
-    );
+    let signature = crate::utils::ed25519_sig(&km, &ixn)?;
     assert_eq!(vc_id.to_string(), cred_said.to_string());
     identifier.finalize_anchor(&ixn, signature).await?;
 
@@ -295,10 +277,7 @@ pub async fn revoke(
     km: Arc<Signer>,
 ) -> Result<(), KeriError> {
     let ixn = identifier.revoke(cred_said)?;
-    let signature = SelfSigningPrefix::new(
-        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
-        km.sign(&ixn)?,
-    );
+    let signature = crate::utils::ed25519_sig(&km, &ixn)?;
     identifier.finalize_anchor(&ixn, signature).await?;
 
     identifier.notify_witnesses().await?;
