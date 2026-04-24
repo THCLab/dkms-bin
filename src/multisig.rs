@@ -3,7 +3,6 @@ use std::sync::Arc;
 use keri_sdk::keri_controller::{
     mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme, Oobi,
 };
-use keri_sdk::Identifier;
 use keri_sdk::keri_core::{
     actor::event_generator,
     event::KeyEvent,
@@ -19,6 +18,8 @@ use keri_sdk::keri_core::{
     signer::Signer,
 };
 use keri_sdk::said::SelfAddressingIdentifier;
+use keri_sdk::types::MultisigConfig;
+use keri_sdk::Identifier;
 
 use crate::{error::CliError, keri::KeriError, utils::Requests};
 
@@ -27,49 +28,24 @@ pub async fn group_incept(
     initiator_signer: Arc<Signer>,
     members: Vec<IdentifierPrefix>,
     key_threshold: u64,
-    next_keys_threshold: Option<u64>,
     witness: Vec<LocationScheme>,
     witness_threshold: u64,
 ) -> Result<IdentifierPrefix, KeriError> {
-    // proces witness oobis
+    // Resolve witness OOBIs so the group inception can reference them.
     for witness_oobi in &witness {
         initiator_id
             .resolve_oobi(&Oobi::Location(witness_oobi.clone()))
             .await?;
     }
 
-    let witnesses_id = witness
-        .into_iter()
-        .map(|witness| match witness.eid {
-            IdentifierPrefix::Basic(id) => id,
-            _ => todo!(),
-        })
-        .collect();
-
-    // Incept group
-    let (group_inception, exn_messages) = initiator_id.incept_group(
+    let config = MultisigConfig {
         members,
-        key_threshold,
-        next_keys_threshold,
-        Some(witnesses_id),
-        Some(witness_threshold),
-        None,
-    )?;
-
-    let signature_icp = crate::utils::ed25519_sig(&initiator_signer, group_inception.as_bytes())?;
-    let signature_exn = crate::utils::ed25519_sig(&initiator_signer, exn_messages[0].as_bytes())?;
-
-    let exn_index_signature = initiator_id.sign_with_index(signature_exn, 0)?;
-
-    let group_id = initiator_id
-        .finalize_group_incept(
-            group_inception.as_bytes(),
-            signature_icp,
-            vec![(exn_messages[0].as_bytes().to_vec(), exn_index_signature)],
-        )
-        .await?;
-
-    Ok(group_id)
+        threshold: key_threshold,
+        witnesses: witness,
+        witness_threshold,
+        delegator: None,
+    };
+    Ok(keri_sdk::operations::create_multisig(initiator_id, &initiator_signer, config).await?)
 }
 
 pub async fn pull_mailbox(

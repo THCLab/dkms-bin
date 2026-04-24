@@ -184,7 +184,6 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 signer,
                 members,
                 group_threshold,
-                None,
                 witnesses_oobis,
                 witness_threshold.unwrap(),
             )
