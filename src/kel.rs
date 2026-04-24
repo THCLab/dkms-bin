@@ -59,7 +59,7 @@ pub async fn handle_kel_query(
     oobi: Option<String>,
 ) -> Result<String, CliError> {
     let id = Arc::new(load(alias)?);
-    let signer = Arc::new(load_signer(alias)?);
+    let signer = load_signer(alias)?;
 
     let out = handle_get_identifier_kel(id.clone(), signer, about_who, oobi).await;
     Ok(match out {
@@ -109,7 +109,7 @@ pub async fn handle_rotate(alias: &str, config_path: Option<PathBuf>) -> Result<
 
     let mut id = load(alias)?;
     // Load next keys as current
-    let current_signer = Arc::new(load_next_signer(alias)?);
+    let current_signer = load_next_signer(alias)?;
 
     let new_next_seed = rotation_config.new_next_seed.unwrap_or({
         let current = SigningKey::generate(&mut rand::rngs::OsRng);

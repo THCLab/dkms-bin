@@ -32,6 +32,8 @@ pub enum CliError {
     #[error(transparent)]
     KeriError(#[from] KeriError),
     #[error(transparent)]
+    Sdk(#[from] keri_sdk::Error),
+    #[error(transparent)]
     LoadingError(#[from] LoadingError),
     #[error("The provided string {0} is not valid secret key. {1}. Please verify your input.")]
     SecretKeyError(String, keri_sdk::keri_core::prefix::error::Error),

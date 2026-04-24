@@ -10,15 +10,14 @@ use std::{
 use config_file::{ConfigFileError, FromConfigFile};
 use ed25519_dalek::SigningKey;
 
-use keri_sdk::keri_controller::{
-    config::ControllerConfig, BasicPrefix, LocationScheme, RedbController as Controller, SeedPrefix,
-};
+use keri_sdk::keri_controller::{BasicPrefix, LocationScheme, SeedPrefix};
 use keri_sdk::keri_core::signer::Signer;
+use keri_sdk::types::IdentifierConfig;
 use keri_sdk::Identifier;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    keri::{setup_identifier, KeriError},
+    keri::KeriError,
     subcommands::identifier::IdentifierSubcommandError,
     tel::remove_registry,
     utils::{save_identifier, save_next_seed, save_seed, working_directory, LoadingError},
@@ -224,30 +223,21 @@ async fn incept(
     next_key: BasicPrefix,
     witness: Vec<LocationScheme>,
     witness_threshold: u64,
-    messagebox: Option<LocationScheme>,
+    _messagebox: Option<LocationScheme>,
     watcher: Vec<LocationScheme>,
 ) -> Result<Identifier, KeriError> {
     // Clear old identifier cache if exists
     let mut query_cache_path = db_path.clone();
     query_cache_path.push("query_cache");
     let _ = std::fs::remove_file(&query_cache_path);
-    let cont = Arc::new(Controller::new(ControllerConfig {
-        db_path,
-        ..ControllerConfig::default()
-    })?);
-    let signer = Arc::new(Signer::new_with_seed(&priv_key)?);
-    let id = setup_identifier(
-        cont,
-        signer,
-        next_key,
-        witness,
-        witness_threshold,
-        messagebox,
-        watcher,
-    )
-    .await?;
 
-    Ok(id)
+    let signer = Arc::new(Signer::new_with_seed(&priv_key)?);
+    let config = IdentifierConfig {
+        witnesses: witness,
+        witness_threshold,
+        watchers: watcher,
+    };
+    Ok(keri_sdk::operations::create_identifier(db_path, signer, next_key, config).await?)
 }
 
 #[test]

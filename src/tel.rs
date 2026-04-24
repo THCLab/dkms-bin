@@ -18,7 +18,7 @@ use keri_sdk::keri_core::{
 use keri_sdk::said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
 
 use crate::{
-    keri::{issue, query_tel, revoke},
+    keri::query_tel,
     multisig::issue_group,
     resolve,
     said::SaidError,
@@ -65,10 +65,10 @@ pub async fn handle_issue(
         for attr in root.iter() {
             attributes.insert(attr.0.clone(), attr.1.clone());
         }
-        let signer = Arc::new(load_signer(alias)?);
+        let signer = load_signer(alias)?;
         if id.registry_id().is_none() {
             // incept TEL if not incepted
-            crate::keri::incept_registry(&mut id, signer.clone()).await?;
+            keri_sdk::operations::incept_registry(&mut id, signer.clone()).await?;
             let registry_id = id.registry_id().as_ref().unwrap().to_string();
             save_registry(alias, &registry_id)?;
         };
@@ -83,7 +83,7 @@ pub async fn handle_issue(
 
         let said = attestation.digest.clone().unwrap();
 
-        issue(&mut id, said, signer).await?;
+        keri_sdk::operations::issue(&mut id, signer, said).await?;
         if oobi {
             match resolve::find_oobi(&id, &None) {
                 Ok(lcs) => {
@@ -218,8 +218,8 @@ pub fn extract_said(data: &str) -> Result<SelfAddressingIdentifier, CliError> {
 
 pub async fn handle_revoke(alias: &str, said: &SelfAddressingIdentifier) -> Result<(), CliError> {
     let mut id = load(alias)?;
-    let signer = Arc::new(load_signer(alias)?);
-    revoke(&mut id, said, signer).await?;
+    let signer = load_signer(alias)?;
+    keri_sdk::operations::revoke(&mut id, signer, said).await?;
     println!("Revoked {}", said);
 
     Ok(())
@@ -236,7 +236,7 @@ pub async fn handle_query(
     let said: SelfAddressingIdentifier = said.parse().unwrap();
     let registry_id: SelfAddressingIdentifier = registry_id.parse().unwrap();
 
-    let signer = Arc::new(load_signer(alias)?);
+    let signer = load_signer(alias)?;
     query_tel(&said, registry_id, &issuer, &who_id, signer).await?;
 
     match who_id.find_vc_state(&said) {

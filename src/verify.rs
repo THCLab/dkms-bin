@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread::sleep, time::Duration};
+use std::{thread::sleep, time::Duration};
 
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
@@ -229,7 +229,7 @@ pub async fn handle_verify(
 
         update_kel(alias, &who_id, &issuer).await?;
 
-        let signer = Arc::new(load_signer(alias).unwrap());
+        let signer = load_signer(alias).unwrap();
         let cached_state = who_id.find_vc_state(&said).unwrap();
         let mut delay = Duration::from_secs(1);
         for _i in 0..5 {

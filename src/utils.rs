@@ -212,18 +212,12 @@ pub fn save_next_seed(seed: &SeedPrefix, path: &Path) -> Result<(), std::io::Err
     Ok(())
 }
 
-pub fn load_signer(alias: &str) -> Result<Signer, LoadingError> {
-    // Thin wrapper: KeriStore's load_signer returns Arc<Signer>, but the
-    // many call sites in dkms-bin still expect an owned Signer. Building a
-    // new one from the persisted seed keeps the signature stable. Once all
-    // callers move to Arc, swap this for `keri_store()?.load_signer(alias)`.
-    let seed = load_seed(alias)?;
-    Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))
+pub fn load_signer(alias: &str) -> Result<Arc<Signer>, LoadingError> {
+    Ok(keri_store()?.load_signer(alias)?)
 }
 
-pub fn load_next_signer(alias: &str) -> Result<Signer, LoadingError> {
-    let seed = load_next_seed(alias)?;
-    Signer::new_with_seed(&seed).map_err(|e| LoadingError::SignerError(e.to_string()))
+pub fn load_next_signer(alias: &str) -> Result<Arc<Signer>, LoadingError> {
+    Ok(keri_store()?.load_next_signer(alias)?)
 }
 
 pub fn handle_info(alias: &str) -> Result<(), LoadingError> {

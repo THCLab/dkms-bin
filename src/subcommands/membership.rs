@@ -161,7 +161,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
         }
         MembershipCommand::Pending { alias, pull, time } => {
             let mut id = load(&alias).unwrap();
-            let signer = Arc::new(load_signer(&alias).unwrap());
+            let signer = load_signer(&alias).unwrap();
             let mem = Arc::new(Membership::new(&alias));
             let req = Requests::new(&alias).unwrap();
             handle_pending(&mut id, req, signer, mem, pull, time).await;
@@ -174,7 +174,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             witness_threshold,
         } => {
             let mut initiator_id = load(&alias).unwrap();
-            let signer = Arc::new(load_signer(&alias).unwrap());
+            let signer = load_signer(&alias).unwrap();
             let membership = Membership::new(&alias);
             let members = membership.get_members(group_alias.as_str());
 
@@ -203,7 +203,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             group_alias,
         } => {
             let mut id = load(&alias).unwrap();
-            let signer = Arc::new(load_signer(&alias).unwrap());
+            let signer = load_signer(&alias).unwrap();
             let req = Requests::new(&alias).unwrap();
             let group_id = accept(&mut id, req, signer, index).await;
             match (group_alias, group_id) {
@@ -256,7 +256,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
         } => {
             let ewa_id = load_identifier(&alias).unwrap();
             let group_id = load_group_id(&alias, &group_alias).unwrap();
-            let ewa_signer = Arc::new(load_signer(&alias).unwrap());
+            let ewa_signer = load_signer(&alias).unwrap();
             let requests = Requests::new(&alias).unwrap();
             handle_group_issue(
                 group_id,
@@ -272,7 +272,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
         MembershipCommand::Registry { alias, group_alias } => {
             let mut group_id = load_group_id(&alias, &group_alias).unwrap();
             let participant_id = load_identifier(&alias).unwrap();
-            let signer = Arc::new(load_signer(&alias).unwrap());
+            let signer = load_signer(&alias).unwrap();
             let membership = Arc::new(Membership::new(&alias));
             let req = Requests::new(alias.as_str()).unwrap();
             handle_group_registry_incept(
