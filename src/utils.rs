@@ -163,7 +163,7 @@ pub fn save_identifier(id: &IdentifierPrefix, path: &Path) -> Result<(), std::io
     Ok(())
 }
 
-pub fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
+fn load_controller(alias: &str) -> Result<Controller, LoadingError> {
     let mut db_path = working_directory()?;
     db_path.push(alias);
     db_path.push("db");

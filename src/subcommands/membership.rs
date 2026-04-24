@@ -217,13 +217,13 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
             let membership = Membership::new(&alias);
 
             if let Some(group_alias) = group_alias {
-                let id = membership.get_identifier(group_alias.as_str());
-                println!("Identifier: {:?}", id.to_string());
-                let cont = load_controller(alias.as_str()).unwrap();
-                let state = cont.find_state(&id);
+                let group_id = membership.get_identifier(group_alias.as_str());
+                println!("Identifier: {:?}", group_id.to_string());
+                let id = load(&alias).unwrap();
+                let state = id.find_state(&group_id);
                 match state {
 						                    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
-						                    Err(MechanicsError::UnknownIdentifierError(_id)) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
+						                    Err(keri_sdk::Error::Mechanics(MechanicsError::UnknownIdentifierError(_id))) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
 						                    Err(e) => println!("Error: {:?}", e),
 					                    }
             } else {
@@ -394,7 +394,7 @@ use crate::{
     subcommands::identifier::find_oobis_for_urls,
     tel::{handle_group_issue, handle_group_registry_incept},
     utils::{
-        load, load_controller, load_group_id, load_identifier, load_signer, working_directory,
+        load, load_group_id, load_identifier, load_signer, working_directory,
         LoadingError, Requests,
     },
 };
