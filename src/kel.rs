@@ -17,9 +17,9 @@ use figment::{
 };
 use keri_sdk::keri_controller::{
     identifier::query::{QueryResponse, WatcherResponseError},
-    BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, RedbIdentifier as Identifier,
-    SeedPrefix,
+    BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
 };
+use keri_sdk::Identifier;
 use keri_sdk::keri_core::{actor::prelude::Message, signer::Signer};
 use serde::{Deserialize, Serialize};
 
@@ -179,17 +179,14 @@ pub async fn handle_get_identifier_kel(
         for oobi in parse_json_arguments::<Oobi>(&[&oobi])? {
             id.send_oobi_to_watcher(id.id(), &oobi)
                 .await
-                .map_err(KeriError::ControllerError)?;
+                .map_err(KeriError::Sdk)?;
         }
     };
 
-    for watcher_id in id
-        .watchers()
-        .map_err(super::keri::KeriError::ControllerError)?
-    {
+    for watcher_id in id.watchers().map_err(KeriError::Sdk)? {
         let qry = id
             .query_full_log(identifier, watcher_id.clone())
-            .map_err(KeriError::ControllerError)?;
+            .map_err(KeriError::Sdk)?;
         let signature =
             crate::utils::ed25519_sig(&signer, &qry.encode().unwrap()).unwrap();
         let (mut qry_reps, mut errs) = id.finalize_query(vec![(qry, signature)]).await;

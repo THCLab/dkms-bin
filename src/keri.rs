@@ -1,15 +1,11 @@
 use anyhow::Result;
-use controller::{
-    BasicPrefix, IdentifierPrefix, LocationScheme, Oobi, RedbController as Controller,
-};
-use keri_sdk::keri_controller::{
-    self as controller,
-    identifier::mechanics::MechanicsError, RedbIdentifier as Identifier,
-};
+use controller::{BasicPrefix, IdentifierPrefix, LocationScheme, Oobi, RedbController as Controller};
+use keri_sdk::keri_controller::{self as controller, identifier::mechanics::MechanicsError};
 use keri_sdk::keri_core::{
     actor::prelude::SelfAddressingIdentifier, keys::KeysError, prefix::IndexedSignature,
     query::mailbox::SignedMailboxQuery, signer::Signer,
 };
+use keri_sdk::Identifier;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -23,6 +19,8 @@ pub enum KeriError {
     Keri(#[from] keri_sdk::keri_core::error::Error),
     #[error(transparent)]
     SigningError(#[from] KeysError),
+    #[error(transparent)]
+    Sdk(#[from] keri_sdk::Error),
 }
 
 pub async fn add_watcher(
@@ -70,7 +68,8 @@ pub async fn setup_identifier(
         .incept(pks, npks, witness.clone(), witness_threshold)
         .await?;
     let signature = crate::utils::ed25519_sig(&signer, signing_inception.as_bytes())?;
-    let mut signing_identifier = cont.finalize_incept(signing_inception.as_bytes(), &signature)?;
+    let mut signing_identifier =
+        Identifier::from_inner(cont.finalize_incept(signing_inception.as_bytes(), &signature)?);
 
     // let mut signing_identifier = Identifier::new(signing_identifier.clone(), cont.clone(), None);
 

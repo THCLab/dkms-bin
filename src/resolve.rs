@@ -2,7 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use keri_sdk::keri_controller::{RedbIdentifier as Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
+use keri_sdk::keri_controller::{EndRole, IdentifierPrefix, LocationScheme, Oobi};
+use keri_sdk::Identifier;
 
 use crate::{
     keri::KeriError,
@@ -22,14 +23,11 @@ pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), Identifier
     let id_cont = load(alias)?;
     let file = fs::read_to_string(path).expect("Should have been able to read the file");
     for oobi in serde_json::from_str::<Vec<Oobi>>(&file).unwrap() {
-        let _ = id_cont
-            .resolve_oobi(&oobi)
-            .await
-            .map_err(KeriError::MechanicsError);
+        let _ = id_cont.resolve_oobi(&oobi).await.map_err(KeriError::Sdk);
         id_cont
             .send_oobi_to_watcher(id_cont.id(), &oobi)
             .await
-            .map_err(KeriError::ControllerError)?;
+            .map_err(KeriError::Sdk)?;
     }
     Ok(())
 }
@@ -38,7 +36,7 @@ pub async fn handle_resolve(alias: &str, path: PathBuf) -> Result<(), Identifier
 pub fn witnesses(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     Ok(identifier
         .find_state(identifier.id())
-        .map_err(KeriError::MechanicsError)?
+        .map_err(KeriError::Sdk)?
         .witness_config
         .witnesses
         .into_iter()
@@ -48,16 +46,15 @@ pub fn witnesses(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliEr
 
 /// Returns watchers' identifiers of alias
 pub fn watcher(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
-    let watchers = identifier.watchers().map_err(KeriError::ControllerError)?;
+    let watchers = identifier.watchers().map_err(KeriError::Sdk)?;
     Ok(watchers)
 }
 
 /// Returns mesagebox' identifiers of alias
 pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     let msgbox = identifeir
-        // .source
         .get_end_role(identifeir.id(), keri_sdk::keri_core::oobi::Role::Messagebox)
-        .map_err(KeriError::ControllerError)?
+        .map_err(KeriError::Sdk)?
         .into_iter()
         .map(|b| b.eid)
         .collect();

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use keri_sdk::keri_controller::{
     mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme, Oobi,
-    RedbIdentifier as Identifier,
 };
+use keri_sdk::Identifier;
 use keri_sdk::keri_core::{
     actor::event_generator,
     event::KeyEvent,

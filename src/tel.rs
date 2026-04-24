@@ -6,7 +6,8 @@ use std::{
 
 use acdc::attributes::InlineAttributes;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_sdk::keri_controller::{EndRole, IdentifierPrefix, Oobi, RedbIdentifier as Identifier};
+use keri_sdk::keri_controller::{EndRole, IdentifierPrefix, Oobi};
+use keri_sdk::Identifier;
 use keri_sdk::keri_core::{
     actor::{event_generator, prelude::SelfAddressingIdentifier},
     event_message::signature::{Signature, SignerData},

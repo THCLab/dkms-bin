@@ -378,11 +378,11 @@ async fn pull_mailbox_helper(
 }
 
 use keri_sdk::keri_controller::{
-    identifier::mechanics::MechanicsError, RedbIdentifier as Identifier,
-    mailbox_updating::ActionRequired,
-    IdentifierPrefix, Oobi,
+    identifier::mechanics::MechanicsError, mailbox_updating::ActionRequired, IdentifierPrefix,
+    Oobi,
 };
 use keri_sdk::keri_core::signer::Signer;
+use keri_sdk::Identifier;
 use redb::{
     Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
 };

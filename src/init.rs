@@ -11,10 +11,10 @@ use config_file::{ConfigFileError, FromConfigFile};
 use ed25519_dalek::SigningKey;
 
 use keri_sdk::keri_controller::{
-    config::ControllerConfig, RedbController as Controller, RedbIdentifier as Identifier, BasicPrefix,
-    LocationScheme, SeedPrefix,
+    config::ControllerConfig, BasicPrefix, LocationScheme, RedbController as Controller, SeedPrefix,
 };
 use keri_sdk::keri_core::signer::Signer;
+use keri_sdk::Identifier;
 use serde::{Deserialize, Serialize};
 
 use crate::{

@@ -3,11 +3,10 @@ use std::{sync::Arc, thread::sleep, time::Duration};
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use keri_sdk::keri_controller::{
-    communication::SendingError,
-    error::ControllerError,
-    identifier::query::QueryResponse, RedbIdentifier as Identifier,
+    communication::SendingError, error::ControllerError, identifier::query::QueryResponse,
     IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix, TelState,
 };
+use keri_sdk::Identifier;
 use keri_sdk::keri_core::{
     event::sections::seal::EventSeal,
     event_message::signature::{get_signatures, Signature, SignerData},
@@ -114,12 +113,10 @@ pub async fn handle_verify(
     for oobi in oobis {
         match who_id.send_oobi_to_watcher(who_id.id(), &oobi).await {
             Ok(_) => (),
-            Err(e) => match e {
-                ControllerError::SendingError(sending_error) => {
-                    return Err(sending_error.into());
-                }
-                _ => unreachable!(),
-            },
+            Err(keri_sdk::Error::Controller(ControllerError::SendingError(sending_error))) => {
+                return Err(sending_error.into());
+            }
+            Err(_) => unreachable!(),
         };
     }
     let message = message.trim();
@@ -185,14 +182,10 @@ pub async fn handle_verify(
     if !attachments.is_empty() {
         match who_id.verify_from_cesr(&message_bytes) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
-            Err(ControllerError::VerificationError(e)) => {
-                if e.iter().any(|(e, _)| {
-                    if let VerificationError::VerificationFailure = e {
-                        true
-                    } else {
-                        false
-                    }
-                }) {
+            Err(keri_sdk::Error::Controller(ControllerError::VerificationError(e))) => {
+                if e.iter()
+                    .any(|(e, _)| matches!(e, VerificationError::VerificationFailure))
+                {
                     return Err(VerifyHandleError::FaultySignatures);
                 };
                 let err_list = ErrorList(
@@ -215,9 +208,9 @@ pub async fn handle_verify(
                 );
                 Err(VerifyHandleError::List(err_list))
             }
-            Err(ControllerError::CesrFormatError) => Err(VerifyHandleError::WrongSignatureFormat(
-                "Wrong format".to_string(),
-            )),
+            Err(keri_sdk::Error::Controller(ControllerError::CesrFormatError)) => Err(
+                VerifyHandleError::WrongSignatureFormat("Wrong format".to_string()),
+            ),
             Err(_e) => todo!(),
         }
     } else {

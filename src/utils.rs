@@ -11,8 +11,8 @@ use anyhow::Result;
 use keri_sdk::keri_controller::{
     config::ControllerConfig,
     identifier::mechanics::MechanicsError,
-    IdentifierPrefix, LocationScheme, RedbController as Controller,
-    RedbIdentifier as Identifier, SeedPrefix, SelfSigningPrefix,
+    IdentifierPrefix, LocationScheme, RedbController as Controller, RedbIdentifier, SeedPrefix,
+    SelfSigningPrefix,
 };
 use keri_sdk::keri_core::{
     event::KeyEvent,
@@ -20,7 +20,7 @@ use keri_sdk::keri_core::{
     mailbox::exchange::{Exchange, ExchangeMessage},
     signer::Signer,
 };
-use keri_sdk::store::KeriStore;
+use keri_sdk::{store::KeriStore, Identifier};
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
 use thiserror::Error;
@@ -39,6 +39,8 @@ pub enum LoadingError {
     ParsingError(String),
     #[error("Controller error: {0}")]
     ControllerError(#[from] keri_sdk::keri_controller::error::ControllerError),
+    #[error("SDK error: {0}")]
+    Sdk(#[from] keri_sdk::Error),
     #[error("Signer error: {0}")]
     SignerError(String),
     #[error("Can't load home path")]
@@ -85,34 +87,31 @@ pub fn ed25519_sig(
 pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
     let mut store_path = working_directory()?;
     store_path.push(alias);
-    let mut id_path = store_path.clone();
-    id_path.push("id");
-    let mut registry_path = store_path.clone();
-    registry_path.push("reg_id");
+    let id_path = store_path.join("id");
+    let registry_path = store_path.join("reg_id");
 
-    let identifier: IdentifierPrefix = fs::read_to_string(id_path.clone())
+    let identifier: IdentifierPrefix = fs::read_to_string(&id_path)
         .unwrap()
-        // .map_err(|_e| LoadingError::UnknownIdentifier(alias.to_string()))
         .parse()
         .map_err(|_e| {
             LoadingError::ParsingError(format!(
                 "Can't parse identifier from file: {}",
-                id_path.to_str().unwrap()
+                id_path.display()
             ))
         })?;
-    let registry_id = match fs::read_to_string(registry_path.clone()) {
-        Ok(reg) => reg.parse().ok(),
-        Err(_) => None,
-    };
+    let registry_id = fs::read_to_string(&registry_path)
+        .ok()
+        .and_then(|reg| reg.parse().ok());
 
     let cont = Arc::new(load_controller(alias)?);
-    Ok(Identifier::new(
+    let inner = RedbIdentifier::new(
         identifier,
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
         cont.cache.clone(),
-    ))
+    );
+    Ok(Identifier::from_inner(inner))
 }
 
 pub fn load_group_id(alias: &str, group_alias: &str) -> Result<Identifier, LoadingError> {
@@ -126,13 +125,14 @@ pub fn load_group_id(alias: &str, group_alias: &str) -> Result<Identifier, Loadi
     println!("Registry id  {:?} loaded for {}", registry_id, group_alias);
 
     let cont = Arc::new(load_controller(alias)?);
-    Ok(Identifier::new(
+    let inner = RedbIdentifier::new(
         identifier,
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
         cont.cache.clone(),
-    ))
+    );
+    Ok(Identifier::from_inner(inner))
 }
 
 pub fn load_identifier(alias: &str) -> Result<IdentifierPrefix, LoadingError> {

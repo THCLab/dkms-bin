@@ -2,16 +2,37 @@
 
 ### 🔧 Changed
 
+- `utils::load()` and `utils::load_group_id()` now return `keri_sdk::Identifier`
+  (the SDK's high-level wrapper) instead of `RedbIdentifier`. All
+  `keri.rs`, `kel.rs`, `tel.rs`, `verify.rs`, `resolve.rs`, `multisig.rs`,
+  `init.rs`, and `subcommands/membership.rs` function signatures now speak
+  the SDK type — dkms-bin no longer threads raw controller generics through
+  its call graph. `RedbIdentifier` remains only in `utils.rs` (to build the
+  inner via `Identifier::from_inner`) and in `export.rs` (raw KEL import).
+- Added `KeriError::Sdk(#[from] keri_sdk::Error)` and
+  `LoadingError::Sdk(#[from] keri_sdk::Error)` so SDK-level errors
+  propagate transparently. `verify.rs` now pattern-matches
+  `keri_sdk::Error::Controller(ControllerError::SendingError(_))` etc.
+  instead of the bare controller enum.
 - Introduced `utils::ed25519_sig` helper and replaced ~27 repeated
   `SelfSigningPrefix::Ed25519Sha512(signer.sign(..).unwrap())` call sites
   across `sign.rs`, `mesagkesto.rs`, `keri.rs`, `kel.rs`, `verify.rs`,
   `multisig.rs`, and `tel.rs` — removes per-file reaches into
   `keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning`.
 - Added a lazily-initialised `KeriStore` singleton in `utils::keri_store()`
-  as the foundation for the next Phase B pass (migrating persistence and
-  `load()` to the SDK's high-level API).
+  as the foundation for the next Phase B pass (full `load()` migration to
+  `KeriStore::load`, rotation via `KeriStore::rotate`, etc.).
 - Cleaned up now-unused `SelfSigningPrefix` / `SelfSigning` imports across
   the touched files.
+
+### 🔧 Related SDK changes
+
+- Added `pub fn keri_sdk::Identifier::from_inner(RedbIdentifier) -> Self`,
+  `pub fn inner(&self)`, and `pub fn inner_mut(&mut self)` escape hatches.
+  Lets consumers like dkms-bin build SDK `Identifier` values from a
+  pre-resolved prefix + shared controller (e.g. multisig group aliases
+  that share a member alias's database) without cloning `KeriStore`'s
+  bookkeeping.
 
 ## [0.9.0] - 2026-04-24
 
