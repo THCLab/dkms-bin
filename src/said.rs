@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use said::{
+use keri_sdk::said::{
     derivation::{HashFunction, HashFunctionCode},
     sad::DerivationCode,
 };
@@ -10,7 +10,7 @@ pub enum SaidError {
     #[error("Missing `d` field in provided json")]
     MissingSaidField,
     #[error("Invalid SAID. {0}")]
-    InvalidSaid(said::error::Error),
+    InvalidSaid(keri_sdk::said::error::Error),
     #[error("Invalid JSON: {0}. Make sure to add single quotes around the provided text.")]
     InvalidJson(String),
     #[error("Serde json error: {0}")]

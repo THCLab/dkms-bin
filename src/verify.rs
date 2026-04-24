@@ -2,19 +2,19 @@ use std::{sync::Arc, thread::sleep, time::Duration};
 
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_controller::{
+use keri_sdk::keri_controller::{
     communication::SendingError,
     error::ControllerError,
-    identifier::{query::QueryResponse, Identifier},
+    identifier::query::QueryResponse, RedbIdentifier as Identifier,
     IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix, TelState,
 };
-use keri_core::{
+use keri_sdk::keri_core::{
     event::sections::seal::EventSeal,
     event_message::signature::{get_signatures, Signature, SignerData},
     processor::validator::{MoreInfoError, VerificationError},
     query::query_event::QueryEvent,
 };
-use said::SelfAddressingIdentifier;
+use keri_sdk::said::SelfAddressingIdentifier;
 
 use crate::{
     keri::query_tel,
@@ -131,13 +131,30 @@ pub async fn handle_verify(
     };
 
     // Parse cesr stream of message
-    let (rest, cesr) = cesrox::parse(&message_bytes).unwrap();
+    use keri_sdk::cesrox::{payload::Payload, value::Value};
+    let message_str = std::str::from_utf8(&message_bytes)
+        .map_err(|e| VerifyHandleError::WrongSignatureFormat(e.to_string()))?;
+    let (rest, values) = keri_sdk::cesrox::parse_all(message_str)
+        .map_err(|e| VerifyHandleError::WrongSignatureFormat(e.to_string()))?;
     if !rest.is_empty() {
-        return Err(VerifyHandleError::RemainingCESR(
-            String::from_utf8(rest.to_vec()).unwrap(),
-        ));
+        return Err(VerifyHandleError::RemainingCESR(rest.to_string()));
     };
-    let attachments = cesr.attachments;
+    let mut payload: Option<Payload> = None;
+    let mut attachments: Vec<keri_sdk::cesrox::group::Group> = Vec::new();
+    for value in values {
+        match value {
+            Value::Payload(p) => payload = Some(p),
+            Value::SpecificGroup(g) => attachments.push(g),
+            Value::UniversalGroup(_, inner) => {
+                for v in inner {
+                    if let Value::SpecificGroup(g) = v {
+                        attachments.push(g);
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
     let signatures: Vec<_> = attachments
         .iter()
         .flat_map(|att| get_signatures(att.clone()).unwrap())
@@ -166,7 +183,7 @@ pub async fn handle_verify(
         };
     }
     if !attachments.is_empty() {
-        match who_id.known_events.verify_from_cesr(&message_bytes) {
+        match who_id.verify_from_cesr(&message_bytes) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
             Err(ControllerError::VerificationError(e)) => {
                 if e.iter().any(|(e, _)| {
@@ -204,12 +221,14 @@ pub async fn handle_verify(
             Err(_e) => todo!(),
         }
     } else {
-        let att: Attestation = match cesr.payload {
-            cesrox::payload::Payload::JSON(items) => serde_json::from_slice(&items)
+        let att: Attestation = match payload
+            .ok_or_else(|| VerifyHandleError::InvalidCredential("missing payload".into()))?
+        {
+            Payload::JSON(items) => serde_json::from_slice(&items)
                 .map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?,
-            cesrox::payload::Payload::CBOR(items) => serde_cbor::from_slice(&items)
+            Payload::CBOR(items) => serde_cbor::from_slice(&items)
                 .map_err(|e| VerifyHandleError::InvalidCredential(e.to_string()))?,
-            cesrox::payload::Payload::MGPK(_items) => todo!(),
+            Payload::MGPK(_items) => todo!(),
         };
         let issuer: IdentifierPrefix = att.issuer.parse().unwrap();
         let said = att.digest.unwrap();

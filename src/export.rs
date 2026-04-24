@@ -1,11 +1,11 @@
 use std::fs::create_dir_all;
 
-use keri_controller::config::ControllerConfig;
-use keri_controller::controller::Controller;
-use keri_controller::{identifier::Identifier, IdentifierPrefix, LocationScheme, SeedPrefix};
-use keri_controller::{CesrPrimitive, EndRole, Oobi};
-use keri_core::event::sections::seal::EventSeal;
-use keri_core::oobi::Role;
+use keri_sdk::keri_controller::config::ControllerConfig;
+use keri_sdk::keri_controller::RedbController as Controller;
+use keri_sdk::keri_controller::{RedbIdentifier as Identifier, IdentifierPrefix, LocationScheme, SeedPrefix};
+use keri_sdk::keri_controller::{CesrPrimitive, EndRole, Oobi};
+use keri_sdk::keri_core::event::sections::seal::EventSeal;
+use keri_sdk::keri_core::oobi::Role;
 use serde::{Deserialize, Serialize};
 
 use crate::tel::save_registry;
@@ -87,6 +87,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         imported.registry_id.clone(),
         controller.known_events.clone(),
         controller.communication.clone(),
+        controller.cache.clone(),
     );
 
     // Pull KEL from witnesses

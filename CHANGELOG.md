@@ -1,3 +1,29 @@
+## [0.9.0] - 2026-04-24
+
+### 🔧 Changed
+
+- Replaced direct dependencies on `keri-core`, `keri-controller`, `said`,
+  `cesrox`, and `teliox` with a single `keri-sdk` dependency. All KERI stack
+  types are now imported via `keri_sdk::keri_core::*`, `keri_sdk::keri_controller::*`,
+  `keri_sdk::said::*`, `keri_sdk::cesrox::*`, and `keri_sdk::teliox::*` re-exports.
+- Adopted the concrete `RedbIdentifier` / `RedbController` / `RedbKnownEvents`
+  type aliases (introduced by the generic `Identifier<D, T, S>` refactor in
+  keri-controller 0.17.13).
+- Reworked `inspect` and `verify` to use the new `cesrox 2.0.0-beta.5`
+  `parse_all` / `Value` API and the updated `Group` enum variants.
+- Adapted to `said 0.5.3-beta.1` — unit `HashFunctionCode::Blake2{B,S}256`
+  variants and the new `Attestation::encode(HashFunctionCode, SerializationFormats)`
+  signature.
+- Added local `[patch]` entries so `acdc`, `messagebox`, and `keri-sdk` git
+  dependencies resolve to their sibling working copies.
+
+### Next
+
+- Phase B (follow-up): migrate call sites to the SDK's high-level API
+  (`keri_sdk::signing`, `keri_sdk::operations`, `keri_sdk::store::KeriStore`)
+  to remove remaining `keri_sdk::keri_controller::*` / `keri_sdk::keri_core::*`
+  references.
+
 ## [0.8.2] - 2026-02-08
 
 ### 🚀 Features

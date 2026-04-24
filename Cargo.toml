@@ -1,15 +1,12 @@
 [package]
 name = "dkms-dev-cli"
-version = "0.8.2"
+version = "0.9.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-keri-core = { version = "0.17.2", features = ["oobi", "mailbox"]}
-keri-controller = { version = "0.17.10"}
-said = { version = "0.4.3", features = ["macros"]}
-cesrox = { version = "0.1.8", features = ["cesr-proof"] }
+keri-sdk = { path = "../keriox/keriox_sdk", version = "0.1.9" }
 anyhow = { version = "1.0" }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -30,12 +27,20 @@ serde_yaml = "0.9.30"
 base64 = "0.22.1"
 tabled = "0.16.0"
 futures = "0.3.31"
-teliox = { version = "0.17.6"}
 tempfile = "3.10.0"
 redb = "2.4.0"
 serde_cbor = "0.11.2"
 
 [dev-dependencies]
+
+[patch."https://github.com/THCLab/acdc-rust"]
+acdc = { path = "../acdc-rust" }
+
+[patch."https://github.com/THCLab/mesagkesto"]
+messagebox = { path = "../mesagkesto/messagebox" }
+
+[patch."https://github.com/THCLab/keriox.git"]
+keri-sdk = { path = "../keriox/keriox_sdk" }
 
 [[bin]]
 name = "dkms"

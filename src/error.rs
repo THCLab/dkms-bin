@@ -1,5 +1,5 @@
 use config_file::ConfigFileError;
-use keri_controller::{identifier::query::WatcherResponseError, IdentifierPrefix};
+use keri_sdk::keri_controller::{identifier::query::WatcherResponseError, IdentifierPrefix};
 use thiserror::Error;
 
 use crate::{
@@ -34,7 +34,7 @@ pub enum CliError {
     #[error(transparent)]
     LoadingError(#[from] LoadingError),
     #[error("The provided string {0} is not valid secret key. {1}. Please verify your input.")]
-    SecretKeyError(String, keri_core::prefix::error::Error),
+    SecretKeyError(String, keri_sdk::keri_core::prefix::error::Error),
     #[error("Invalid base64: {0}")]
     B64Error(String),
     #[error("Invalid seed code: {0}")]

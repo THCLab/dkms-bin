@@ -1,5 +1,5 @@
-use keri_controller::{mailbox_updating::ActionRequired, CesrPrimitive};
-use said::SelfAddressingIdentifier;
+use keri_sdk::keri_controller::{mailbox_updating::ActionRequired, CesrPrimitive};
+use keri_sdk::said::SelfAddressingIdentifier;
 use std::{
     fs::{self, File},
     io::Write,
@@ -8,13 +8,13 @@ use std::{
 };
 
 use anyhow::Result;
-use keri_controller::{
+use keri_sdk::keri_controller::{
     config::ControllerConfig,
-    controller::Controller,
-    identifier::{mechanics::MechanicsError, Identifier},
+    RedbController as Controller,
+    identifier::mechanics::MechanicsError, RedbIdentifier as Identifier,
     IdentifierPrefix, LocationScheme, SeedPrefix,
 };
-use keri_core::{
+use keri_sdk::keri_core::{
     event::KeyEvent,
     event_message::msg::KeriEvent,
     mailbox::exchange::{Exchange, ExchangeMessage},
@@ -37,7 +37,7 @@ pub enum LoadingError {
     #[error("Parsing error: {0}")]
     ParsingError(String),
     #[error("Controller error: {0}")]
-    ControllerError(#[from] keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_sdk::keri_controller::error::ControllerError),
     #[error("Signer error: {0}")]
     SignerError(String),
     #[error("Can't load home path")]
@@ -81,6 +81,7 @@ pub fn load(alias: &str) -> Result<Identifier, LoadingError> {
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
+        cont.cache.clone(),
     ))
 }
 
@@ -100,6 +101,7 @@ pub fn load_group_id(alias: &str, group_alias: &str) -> Result<Identifier, Loadi
         registry_id,
         cont.known_events.clone(),
         cont.communication.clone(),
+        cont.cache.clone(),
     ))
 }
 
@@ -258,8 +260,8 @@ pub fn collect_witness_data(
     );
     let witness_threshold = state.witness_config.tally;
     let witness_threshold = match witness_threshold {
-        keri_core::event::sections::threshold::SignatureThreshold::Simple(i) => i,
-        keri_core::event::sections::threshold::SignatureThreshold::Weighted(
+        keri_sdk::keri_core::event::sections::threshold::SignatureThreshold::Simple(i) => i,
+        keri_sdk::keri_core::event::sections::threshold::SignatureThreshold::Weighted(
             _weighted_threshold,
         ) => {
             todo!()
@@ -269,7 +271,7 @@ pub fn collect_witness_data(
 }
 
 pub fn collect_watchers_data(identifier: &Identifier) -> Result<Vec<LocationScheme>, LoadingError> {
-    let watchers = identifier.get_role_location(identifier.id(), keri_core::oobi::Role::Watcher)?;
+    let watchers = identifier.get_role_location(identifier.id(), keri_sdk::keri_core::oobi::Role::Watcher)?;
     Ok(watchers)
 }
 
@@ -506,7 +508,7 @@ impl Requests {
 
 #[test]
 pub fn test_parse_json_arguments() {
-    use keri_controller::LocationScheme;
+    use keri_sdk::keri_controller::LocationScheme;
 
     let input_single = r#"{"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}"#;
     let loc = parse_json_arguments::<LocationScheme>(&[input_single]);

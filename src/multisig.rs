@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use cesrox::primitives::codes::self_signing::SelfSigning;
-use keri_controller::{
-    identifier::Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
+use keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning;
+use keri_sdk::keri_controller::{
+    RedbIdentifier as Identifier, mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme,
     Oobi, SelfSigningPrefix,
 };
-use keri_core::{
+use keri_sdk::keri_core::{
     actor::event_generator,
     event::KeyEvent,
     event_message::{
@@ -19,7 +19,7 @@ use keri_core::{
     query::mailbox::MailboxRoute,
     signer::Signer,
 };
-use said::SelfAddressingIdentifier;
+use keri_sdk::said::SelfAddressingIdentifier;
 
 use crate::{error::CliError, keri::KeriError, utils::Requests};
 

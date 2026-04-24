@@ -1,5 +1,5 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
-use cesrox::primitives::codes::seed::SeedCode;
+use keri_sdk::cesrox::primitives::codes::seed::SeedCode;
 use clap::Subcommand;
 
 use crate::{

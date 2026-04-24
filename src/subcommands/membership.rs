@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use said::SelfAddressingIdentifier;
+use keri_sdk::said::SelfAddressingIdentifier;
 use std::{str::FromStr, sync::Arc, thread::sleep, time::Duration};
 
 #[derive(Subcommand)]
@@ -377,12 +377,12 @@ async fn pull_mailbox_helper(
     }
 }
 
-use keri_controller::{
-    identifier::{mechanics::MechanicsError, Identifier},
+use keri_sdk::keri_controller::{
+    identifier::mechanics::MechanicsError, RedbIdentifier as Identifier,
     mailbox_updating::ActionRequired,
     IdentifierPrefix, Oobi,
 };
-use keri_core::signer::Signer;
+use keri_sdk::keri_core::signer::Signer;
 use redb::{
     Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
 };

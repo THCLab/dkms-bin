@@ -1,6 +1,6 @@
-use cesrox::primitives::codes::seed::SeedCode;
+use keri_sdk::cesrox::primitives::codes::seed::SeedCode;
 use ed25519_dalek::SigningKey;
-use keri_controller::{CesrPrimitive, SeedPrefix};
+use keri_sdk::keri_controller::{CesrPrimitive, SeedPrefix};
 
 pub fn generate_seed() -> String {
     let sk = SigningKey::generate(&mut rand::rngs::OsRng);
@@ -12,7 +12,7 @@ pub fn generate_seed() -> String {
 pub fn convert_to_seed(
     code: SeedCode,
     secret_key: Vec<u8>,
-) -> Result<String, keri_core::prefix::error::Error> {
+) -> Result<String, keri_sdk::keri_core::prefix::error::Error> {
     let seed = SeedPrefix::new(code, secret_key);
     // check if seed is ok
     seed.derive_key_pair()?;

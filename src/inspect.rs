@@ -1,10 +1,9 @@
-use cesrox::{
+use keri_sdk::cesrox::{
     group::Group,
-    parse_many,
-    primitives::{IndexedSignature, PublicKey, Signature, TransferableQuadruple},
+    primitives::{IndexedSignature, PublicKey, Signature},
 };
-use keri_controller::{BasicPrefix, CesrPrimitive, SelfSigningPrefix};
-use said::{derivation::HashFunctionCode, SelfAddressingIdentifier};
+use keri_sdk::keri_controller::{BasicPrefix, CesrPrimitive, SelfSigningPrefix};
+use keri_sdk::said::{derivation::HashFunctionCode, SelfAddressingIdentifier};
 
 fn readable_self_signing(sig: SelfSigningPrefix) -> String {
     let description = match &sig {
@@ -35,8 +34,8 @@ fn _readable_basic(bp: BasicPrefix) -> String {
 fn readable_self_addressing(sai: SelfAddressingIdentifier) -> String {
     let description = match HashFunctionCode::from(&sai.derivation) {
         HashFunctionCode::Blake3_256 => "Blake3-256 Digest",
-        HashFunctionCode::Blake2B256(_) => "Blake2b-256 Digest",
-        HashFunctionCode::Blake2S256(_) => "Blake2s-256 Digest",
+        HashFunctionCode::Blake2B256 => "Blake2b-256 Digest",
+        HashFunctionCode::Blake2S256 => "Blake2s-256 Digest",
         HashFunctionCode::SHA3_256 => "SHA3-256 Digest",
         HashFunctionCode::SHA2_256 => "SHA2-256 Digest",
         HashFunctionCode::Blake3_512 => "Blake3-512 Digest",
@@ -53,33 +52,23 @@ fn readable_indexed_signature(indexed: &IndexedSignature) -> String {
     readable_self_signing(SelfSigningPrefix::new(code, signature.to_vec()))
 }
 
-fn readable_signature_group_element(quadruple: TransferableQuadruple) -> String {
-    let mut output = String::new();
-    let (identifier, sn, digest, mut signatures) = quadruple;
-    let cesr_primitive = identifier.to_str();
-    output.push_str(&format!("    KEL Identifier: {}\n", cesr_primitive));
-    output.push_str(&format!("    event number: {}\n", sn));
-    output.push_str(&format!(
-        "    event digest: {}\n",
-        readable_self_addressing(digest.into())
-    ));
-    signatures.sort_by(|a, b| a.0.index.current().cmp(&b.0.index.current()));
-    if signatures.len() == 1 {
-        output.push_str("    Signature: ")
-    } else {
-        output.push_str("    Signatures:\n  ")
-    }
-    for signature in signatures {
-        output.push_str(&readable_indexed_signature(&signature).to_string());
-    }
-    output
+fn readable_anchoring_seal(
+    seal: keri_sdk::cesrox::primitives::AnchoringEventSeal,
+) -> String {
+    let (identifier, sn, digest) = seal;
+    format!(
+        "    KEL Identifier: {}\n    event number: {}\n    event digest: {}\n",
+        identifier.to_str(),
+        sn,
+        readable_self_addressing(digest.into()),
+    )
 }
 
 fn readable_nontrans_receipt(pair: (PublicKey, Signature)) -> String {
     let (identifier, signature) = pair;
     let identifier = BasicPrefix::new(
         identifier.0,
-        keri_core::keys::PublicKey {
+        keri_sdk::keri_core::keys::PublicKey {
             public_key: identifier.1,
         },
     )
@@ -91,71 +80,104 @@ fn readable_nontrans_receipt(pair: (PublicKey, Signature)) -> String {
     )
 }
 
+fn print_group(group: Group) {
+    match group {
+        Group::IndexedControllerSignatures(vec) => {
+            println!(
+                "  {}",
+                if vec.len() == 1 {
+                    "Signature:"
+                } else {
+                    "Signatures:"
+                }
+            );
+            for signature in vec {
+                println!("{}", readable_indexed_signature(&signature));
+            }
+        }
+        Group::IndexedWitnessSignatures(vec) => {
+            println!(
+                "  {}",
+                if vec.len() == 1 {
+                    "Witness signature:"
+                } else {
+                    "Witness signatures:"
+                }
+            );
+            for signature in vec {
+                println!("{}", readable_indexed_signature(&signature));
+            }
+        }
+        Group::NontransReceiptCouples(vec) => {
+            println!(
+                "  {}",
+                if vec.len() == 1 {
+                    "Nontransferable signature:"
+                } else {
+                    "Nontransferable signatures:"
+                }
+            );
+            for couplet in vec {
+                println!("{}", readable_nontrans_receipt(couplet));
+            }
+        }
+        Group::AnchoringSeals(vec) => {
+            println!(
+                "  {}",
+                if vec.len() == 1 {
+                    "Anchoring seal:"
+                } else {
+                    "Anchoring seals:"
+                }
+            );
+            for seal in vec {
+                println!("{}", readable_anchoring_seal(seal));
+            }
+        }
+        Group::SourceSealCouples(_)
+        | Group::FirstSeenReplyCouples(_)
+        | Group::PathedMaterialQuadruplet(_, _)
+        | Group::TSPPayload(_) => {
+            println!("  (group variant not yet rendered: {:?})", group);
+        }
+    }
+}
+
 pub fn inspect(cesr: &str) {
+    use keri_sdk::cesrox::value::Value;
     let no_whitespace = cesr
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect::<String>();
-    let (rest, stream) = parse_many(no_whitespace.as_bytes()).expect("Invalid CESR stream");
-    for stream in stream {
-        println!(
-            "Payload: {}",
-            String::from_utf8(stream.payload.to_vec()).unwrap()
-        );
-        println!("Attachments: ");
-        let atts = stream.attachments;
-        for group in atts {
-            match group {
-                Group::IndexedControllerSignatures(vec) => {
-                    if vec.len() == 1 {
-                        println!("  Signature:")
-                    } else {
-                        println!("  Signatures:")
-                    }
-                    for signature in vec {
-                        println!("{}", readable_indexed_signature(&signature));
-                    }
-                }
-                Group::IndexedWitnessSignatures(vec) => {
-                    if vec.len() == 1 {
-                        println!("  Witness signature:")
-                    } else {
-                        println!("  Witness signatures:")
-                    }
-                    for signature in vec {
-                        println!("{}", readable_indexed_signature(&signature));
-                    }
-                }
-                Group::NontransReceiptCouples(vec) => {
-                    if vec.len() == 1 {
-                        println!("  Nontransferable signature:")
-                    } else {
-                        println!("  Nontransferable signatures:")
-                    }
-                    for couplet in vec {
-                        println!("{}", readable_nontrans_receipt(couplet));
-                    }
-                }
-                Group::TransIndexedSigGroups(vec) => {
-                    if vec.len() == 1 {
-                        println!("  Transferable signature:")
-                    } else {
-                        println!("  Transferable signatures:")
-                    }
-                    for element in vec {
-                        println!("{}", readable_signature_group_element(element))
-                    }
-                }
-                Group::LastEstSignaturesGroups(_vec) => todo!(),
-                Group::Frame(_vec) => todo!(),
-                Group::PathedMaterialQuadruplet(_material_path, _vec) => todo!(),
-                Group::SourceSealCouples(_vec) => todo!(),
-                Group::FirstSeenReplyCouples(_vec) => todo!(),
+    let (rest, values) =
+        keri_sdk::cesrox::parse_all(&no_whitespace).expect("Invalid CESR stream");
+    for value in values {
+        match value {
+            Value::Payload(payload) => {
+                let bytes = match payload {
+                    keri_sdk::cesrox::payload::Payload::JSON(b)
+                    | keri_sdk::cesrox::payload::Payload::CBOR(b)
+                    | keri_sdk::cesrox::payload::Payload::MGPK(b) => b,
+                };
+                println!("Payload: {}", String::from_utf8_lossy(&bytes));
             }
+            Value::SpecificGroup(group) => {
+                println!("Attachment:");
+                print_group(group);
+            }
+            Value::UniversalGroup(_, inner) => {
+                println!("Attachment (universal group):");
+                for v in inner {
+                    if let Value::SpecificGroup(g) = v {
+                        print_group(g);
+                    }
+                }
+            }
+            other => println!("  (unhandled value: {:?})", other),
         }
     }
     if !rest.is_empty() {
-        println!("\nRemaining part: {}", std::str::from_utf8(rest).unwrap());
+        println!("\nRemaining part: {}", rest);
     }
 }
 

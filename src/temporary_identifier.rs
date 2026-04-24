@@ -1,29 +1,31 @@
 use std::sync::Arc;
 
-use keri_controller::{
-    communication::{Communication, SendingError},
+use keri_sdk::keri_controller::{
+    communication::{Communication, HTTPTelTransport, SendingError},
     error::ControllerError,
     identifier::nontransferable::NontransferableIdentifier,
-    known_events::KnownEvents,
+    known_events::RedbKnownEvents,
     BasicPrefix, IdentifierPrefix, LocationScheme,
 };
-use keri_core::{
+use keri_sdk::keri_core::{
     actor::{
         error::ActorError, possible_response::PossibleResponse, prelude::Message, QueryError,
         SignedQueryError,
     },
+    database::redb::RedbDatabase,
+    oobi_manager::storage::RedbOobiStorage,
     processor::escrow::EscrowConfig,
     signer::Signer,
     transport::default::DefaultTransport,
 };
-use keri_controller::communication::HTTPTelTransport;
+use keri_sdk::teliox::database::redb::RedbTelDatabase;
 use tempfile::Builder;
 
 use crate::export::ExportError;
 
 pub struct TemporaryIdentifier {
     signer: Arc<Signer>,
-    id: NontransferableIdentifier,
+    id: NontransferableIdentifier<RedbDatabase, RedbTelDatabase, RedbOobiStorage>,
 }
 
 pub fn generate_temporary_identifier() -> Result<TemporaryIdentifier, ExportError> {
@@ -38,9 +40,10 @@ pub fn generate_temporary_identifier() -> Result<TemporaryIdentifier, ExportErro
         .map_err(|_e| ExportError::TemporaryId("Temporary file creation error".to_string()))?;
 
     let tmp_events = Arc::new(
-        KnownEvents::new(tmp_dir.path().to_path_buf(), EscrowConfig::default()).map_err(|_e| {
-            ExportError::TemporaryId("Temporary identifier creation error".to_string())
-        })?,
+        RedbKnownEvents::with_redb(tmp_dir.path().to_path_buf(), EscrowConfig::default())
+            .map_err(|_e| {
+                ExportError::TemporaryId("Temporary identifier creation error".to_string())
+            })?,
     );
     let comm = Arc::new(Communication {
         events: tmp_events.clone(),

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use keri_controller::IdentifierPrefix;
+use keri_sdk::keri_controller::IdentifierPrefix;
 
 use crate::{
     kel::{handle_kel_query, handle_rotate},

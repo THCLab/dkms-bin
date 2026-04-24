@@ -1,12 +1,12 @@
 use anyhow::Result;
 use controller::{
-    controller::Controller, BasicPrefix, IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix,
+    RedbController as Controller, BasicPrefix, IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix,
 };
-use keri_controller::{
+use keri_sdk::keri_controller::{
     self as controller,
-    identifier::{mechanics::MechanicsError, Identifier},
+    identifier::mechanics::MechanicsError, RedbIdentifier as Identifier,
 };
-use keri_core::{
+use keri_sdk::keri_core::{
     actor::prelude::SelfAddressingIdentifier, keys::KeysError, prefix::IndexedSignature,
     query::mailbox::SignedMailboxQuery, signer::Signer,
 };
@@ -16,11 +16,11 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum KeriError {
     #[error(transparent)]
-    ControllerError(#[from] keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_sdk::keri_controller::error::ControllerError),
     #[error(transparent)]
     MechanicsError(#[from] MechanicsError),
     #[error(transparent)]
-    Keri(#[from] keri_core::error::Error),
+    Keri(#[from] keri_sdk::keri_core::error::Error),
     #[error(transparent)]
     SigningError(#[from] KeysError),
 }
@@ -34,7 +34,7 @@ pub async fn add_watcher(
         .await?;
     let rpy = id.add_watcher(watcher_oobi.eid.clone())?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         km.sign(rpy.as_bytes())?,
     );
     id.finalize_add_watcher(rpy.as_bytes(), signature).await?;
@@ -50,7 +50,7 @@ pub async fn add_watcher(
 //     id.resolve_oobi(&Oobi::Location(messagebox_oobi.clone())).await?;
 //     let rpy = id.add_messagebox(messagebox_oobi.eid.clone())?;
 //     let signature = SelfSigningPrefix::new(
-//         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+//         keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
 //         km.sign(rpy.as_bytes())?,
 //     );
 //     id.finalize_event(rpy.as_bytes(), signature).await?;
@@ -73,7 +73,7 @@ pub async fn setup_identifier(
         .incept(pks, npks, witness.clone(), witness_threshold)
         .await?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         signer.sign(signing_inception.as_bytes())?,
     );
     let mut signing_identifier = cont.finalize_incept(signing_inception.as_bytes(), &signature)?;
@@ -117,7 +117,7 @@ pub async fn incept_registry(id: &mut Identifier, signer: Arc<Signer>) -> Result
     let (_reg_id, ixn) = id.incept_registry()?;
     let encoded_ixn = ixn.encode()?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         signer.sign(&encoded_ixn)?,
     );
     id.finalize_anchor(&encoded_ixn, signature).await?;
@@ -167,7 +167,7 @@ pub async fn query_mailbox(
 // pub async fn _query_messagebox(id: &Identifier, km: Arc<CryptoBox>) -> Result<String, KeriError> {
 //     let qry = messagebox::query_by_sn(id.id.to_string(), 0);
 //     let signature = SelfSigningPrefix::new(
-//         cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+//         keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
 //         km.sign(qry.to_string().as_bytes())?,
 //     );
 
@@ -198,7 +198,7 @@ pub async fn query_tel(
         IdentifierPrefix::self_addressing(acdc_d.clone()),
     )?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         km.sign(qry.encode()?)?,
     );
 
@@ -226,7 +226,7 @@ pub async fn rotate(
     //         id.source
     //             .send_message_to(
     //                 &witness.eid,
-    //                 keri_core::oobi::Scheme::Http,
+    //                 keri_sdk::keri_core::oobi::Scheme::Http,
     //                 Message::Notice(msg.clone()),
     //             )
     //             .await?;
@@ -244,7 +244,7 @@ pub async fn rotate(
         )
         .await?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         current_signer.sign(rotation.as_bytes())?,
     );
     id.finalize_rotate(rotation.as_bytes(), signature).await?;
@@ -269,7 +269,7 @@ pub async fn issue(
     let (vc_id, ixn) = identifier.issue(cred_said.clone())?;
     let ixn = ixn.encode()?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         km.sign(&ixn)?,
     );
     assert_eq!(vc_id.to_string(), cred_said.to_string());
@@ -296,7 +296,7 @@ pub async fn revoke(
 ) -> Result<(), KeriError> {
     let ixn = identifier.revoke(cred_said)?;
     let signature = SelfSigningPrefix::new(
-        cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
+        keri_sdk::cesrox::primitives::codes::self_signing::SelfSigning::Ed25519Sha512,
         km.sign(&ixn)?,
     );
     identifier.finalize_anchor(&ixn, signature).await?;

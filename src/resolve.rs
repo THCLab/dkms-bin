@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use keri_controller::{identifier::Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
+use keri_sdk::keri_controller::{RedbIdentifier as Identifier, EndRole, IdentifierPrefix, LocationScheme, Oobi};
 
 use crate::{
     keri::KeriError,
@@ -56,7 +56,7 @@ pub fn watcher(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliErro
 pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     let msgbox = identifeir
         // .source
-        .get_end_role(identifeir.id(), keri_core::oobi::Role::Messagebox)
+        .get_end_role(identifeir.id(), keri_sdk::keri_core::oobi::Role::Messagebox)
         .map_err(KeriError::ControllerError)?
         .into_iter()
         .map(|b| b.eid)
@@ -101,14 +101,14 @@ pub fn find_oobi(
                 .flat_map(|cid| {
                     let mut oobis = vec![Oobi::EndRole(EndRole {
                         eid: cid.clone(),
-                        role: keri_core::oobi::Role::Witness,
+                        role: keri_sdk::keri_core::oobi::Role::Witness,
                         cid: identifier.id().clone(),
                     })];
 
                     if let Some(reg) = identifier.registry_id() {
                         oobis.push(Oobi::EndRole(EndRole {
                             cid: reg.clone(),
-                            role: keri_core::oobi::Role::Witness,
+                            role: keri_sdk::keri_core::oobi::Role::Witness,
                             eid: cid.clone(),
                         }));
                     }
