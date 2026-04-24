@@ -1,5 +1,29 @@
 ## [Unreleased] - Phase B progress
 
+### 🔧 Changed (Phase B — SDK operations adoption)
+
+- `init.rs::incept` now calls `keri_sdk::operations::create_identifier`
+  with a typed `IdentifierConfig`. The bespoke `setup_identifier`,
+  `add_watcher`, and `query_mailbox` helpers in `keri.rs` (~180 lines) are
+  gone.
+- `tel.rs::handle_issue`, `handle_revoke`, and the registry-inception
+  path call `keri_sdk::operations::issue`, `::revoke`, and
+  `::incept_registry` directly. The matching wrappers in `keri.rs` are
+  gone.
+- `multisig.rs::group_incept` delegates to
+  `keri_sdk::operations::create_multisig` via `MultisigConfig`; the
+  manual `incept_group` + signature plumbing is gone. The unused
+  `next_keys_threshold` argument is removed from its signature.
+- `utils::load_signer` / `load_next_signer` now return `Arc<Signer>` via
+  `KeriStore::load_signer` / `load_next_signer`. Callers in `kel.rs`,
+  `tel.rs`, `verify.rs`, and `subcommands/membership.rs` drop their
+  `Arc::new(..)` wrappers.
+- `CliError` gains `Sdk(#[from] keri_sdk::Error)` so
+  `keri_sdk::operations::*` propagate through `?` cleanly.
+- `subcommands/membership.rs`'s `Info` handler reads group state via
+  `load(alias).find_state(&group_id)` instead of `load_controller`;
+  `load_controller` is now private to `utils.rs`.
+
 ### 🔧 Changed
 
 - `utils::load()` and `utils::load_group_id()` now return `keri_sdk::Identifier`
