@@ -1,3 +1,24 @@
+## [Unreleased] - keri-sdk 0.2.0
+
+### 🔧 Changed (keri-sdk 0.2.0 upgrade)
+
+- Bumped `keri-sdk` to 0.2.0. The SDK crate root now exposes only the
+  high-level facade (`Keri`, `Identity`, …); the mid-level API dkms-bin
+  builds on moved under `keri_sdk::advanced`. All imports are rewritten
+  accordingly: `keri_sdk::advanced::{Identifier, Error, operations, types,
+  store, …}` for surfaced items, and `keri_sdk::advanced::raw::{cesrox,
+  keri_controller, keri_core, said, teliox}` for the deep upstream paths
+  the SDK does not re-export individually.
+- `IdentifierConfig` gained an `algorithm` field; `init.rs::incept` pins
+  `SignerAlgorithm::Ed25519`, preserving previous behaviour.
+- `Identifier::witnesses()` now returns `Vec<BasicPrefix>` instead of an
+  iterator — the `.collect()` / `.map()` at the call sites in `multisig.rs`
+  and `tel.rs` are adjusted.
+- `NontransferableIdentifier::sign` now returns a `Result`; the temporary
+  identifier used for KEL/KSN/TEL pulls propagates the error.
+- `inspect.rs` renders the new `ECDSA256r1` key and signature prefixes and
+  the `TransLastIdxSigGroups` CESR group variant.
+
 ## [Unreleased] - Phase B progress
 
 ### 🔧 Changed (Phase B — SDK operations adoption)

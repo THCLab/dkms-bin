@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use keri_sdk::keri_controller::{IdentifierPrefix, LocationScheme};
+use keri_sdk::advanced::{IdentifierPrefix, LocationScheme};
 
 use crate::temporary_identifier::generate_temporary_identifier;
 

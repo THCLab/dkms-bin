@@ -1,26 +1,24 @@
 use std::sync::Arc;
 
-use keri_sdk::keri_controller::{
-    identifier::mechanics::MechanicsError, BasicPrefix, IdentifierPrefix, LocationScheme,
-};
-use keri_sdk::keri_core::{
+use keri_sdk::advanced::{BasicPrefix, IdentifierPrefix, LocationScheme, MechanicsError};
+use keri_sdk::advanced::raw::keri_core::{
     actor::prelude::SelfAddressingIdentifier, keys::KeysError, signer::Signer,
 };
-use keri_sdk::Identifier;
+use keri_sdk::advanced::Identifier;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum KeriError {
     #[error(transparent)]
-    ControllerError(#[from] keri_sdk::keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_sdk::advanced::raw::keri_controller::error::ControllerError),
     #[error(transparent)]
     MechanicsError(#[from] MechanicsError),
     #[error(transparent)]
-    Keri(#[from] keri_sdk::keri_core::error::Error),
+    Keri(#[from] keri_sdk::advanced::raw::keri_core::error::Error),
     #[error(transparent)]
     SigningError(#[from] KeysError),
     #[error(transparent)]
-    Sdk(#[from] keri_sdk::Error),
+    Sdk(#[from] keri_sdk::advanced::Error),
 }
 
 /// Query the TEL for a specific credential. Signs and submits the query to
@@ -42,9 +40,9 @@ pub async fn query_tel(
     Ok(())
 }
 
-/// Rotate keys. Thin wrapper over [`keri_sdk::operations::rotate`] that also
+/// Rotate keys. Thin wrapper over [`keri_sdk::advanced::operations::rotate`] that also
 /// lets callers specify `new_next_threshold` (not currently exposed through
-/// [`keri_sdk::types::RotationConfig`]) and a prebuilt `new_next_keys` vec.
+/// [`keri_sdk::advanced::types::RotationConfig`]) and a prebuilt `new_next_keys` vec.
 pub async fn rotate(
     id: &mut Identifier,
     current_signer: Arc<Signer>,
@@ -72,7 +70,7 @@ pub async fn rotate(
 
     let witnesses = id.find_state(id.id())?.witness_config.witnesses;
     for witness in witnesses {
-        keri_sdk::operations::query_mailbox(id, current_signer.clone(), &witness).await?;
+        keri_sdk::advanced::operations::query_mailbox(id, current_signer.clone(), &witness).await?;
     }
 
     Ok(())

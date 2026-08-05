@@ -1,6 +1,6 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use clap::Subcommand;
-use keri_sdk::said::{sad::SerializationFormats, SelfAddressingIdentifier};
+use keri_sdk::advanced::{SelfAddressingIdentifier, SerializationFormats};
 use std::io::{self, IsTerminal, Read};
 
 use crate::{

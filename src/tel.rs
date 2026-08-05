@@ -6,16 +6,17 @@ use std::{
 
 use acdc::attributes::InlineAttributes;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_sdk::keri_controller::{EndRole, IdentifierPrefix, Oobi};
-use keri_sdk::Identifier;
-use keri_sdk::keri_core::{
+use keri_sdk::advanced::raw::keri_core::{
     actor::{event_generator, prelude::SelfAddressingIdentifier},
     event_message::signature::{Signature, SignerData},
     mailbox::exchange::ForwardTopic,
     prefix::IndexedSignature,
     signer::Signer,
 };
-use keri_sdk::said::{derivation::HashFunctionCode, sad::SerializationFormats, version::Encode};
+use keri_sdk::advanced::{
+    EndRole, HashFunctionCode, Identifier, IdentifierPrefix, Oobi, SaidEncode as Encode,
+    SerializationFormats,
+};
 
 use crate::{
     keri::query_tel,
@@ -68,7 +69,7 @@ pub async fn handle_issue(
         let signer = load_signer(alias)?;
         if id.registry_id().is_none() {
             // incept TEL if not incepted
-            keri_sdk::operations::incept_registry(&mut id, signer.clone()).await?;
+            keri_sdk::advanced::operations::incept_registry(&mut id, signer.clone()).await?;
             let registry_id = id.registry_id().as_ref().unwrap().to_string();
             save_registry(alias, &registry_id)?;
         };
@@ -83,7 +84,7 @@ pub async fn handle_issue(
 
         let said = attestation.digest.clone().unwrap();
 
-        keri_sdk::operations::issue(&mut id, signer, said).await?;
+        keri_sdk::advanced::operations::issue(&mut id, signer, said).await?;
         if oobi {
             match resolve::find_oobi(&id, &None) {
                 Ok(lcs) => {
@@ -219,7 +220,7 @@ pub fn extract_said(data: &str) -> Result<SelfAddressingIdentifier, CliError> {
 pub async fn handle_revoke(alias: &str, said: &SelfAddressingIdentifier) -> Result<(), CliError> {
     let mut id = load(alias)?;
     let signer = load_signer(alias)?;
-    keri_sdk::operations::revoke(&mut id, signer, said).await?;
+    keri_sdk::advanced::operations::revoke(&mut id, signer, said).await?;
     println!("Revoked {}", said);
 
     Ok(())
@@ -253,10 +254,11 @@ pub fn handle_tel_oobi(alias: &str) -> Result<(), CliError> {
     if let Some(registry_id) = identifier.registry_id() {
         let oobis = identifier
             .witnesses()
+            .into_iter()
             .map(|wit_id| {
                 Oobi::EndRole(EndRole {
                     cid: registry_id.clone(),
-                    role: keri_sdk::keri_core::oobi::Role::Witness,
+                    role: keri_sdk::advanced::Role::Witness,
                     eid: IdentifierPrefix::Basic(wit_id),
                 })
             })

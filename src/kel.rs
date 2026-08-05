@@ -15,12 +15,11 @@ use figment::{
     providers::{Format, Yaml},
     Figment,
 };
-use keri_sdk::keri_controller::{
-    identifier::query::{QueryResponse, WatcherResponseError},
-    BasicPrefix, CesrPrimitive, IdentifierPrefix, LocationScheme, Oobi, SeedPrefix,
+use keri_sdk::advanced::{
+    BasicPrefix, CesrPrimitive, Identifier, IdentifierPrefix, LocationScheme, Oobi, QueryResponse,
+    SeedPrefix, WatcherResponseError,
 };
-use keri_sdk::Identifier;
-use keri_sdk::keri_core::{actor::prelude::Message, signer::Signer};
+use keri_sdk::advanced::raw::keri_core::{actor::prelude::Message, signer::Signer};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -77,7 +76,7 @@ pub async fn handle_kel_query(
                                 // check if identifier oobi is known
                                 let oobis = id
                                     .clone()
-                                    .get_end_role(identifier_prefix, keri_sdk::keri_core::oobi::Role::Witness)
+                                    .get_end_role(identifier_prefix, keri_sdk::advanced::Role::Witness)
                                     .unwrap();
                                 if oobis.is_empty() {
                                     VerifyHandleError::MissingOobi(identifier_prefix.clone())

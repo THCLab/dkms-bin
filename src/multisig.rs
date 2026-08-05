@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use keri_sdk::keri_controller::{
-    mailbox_updating::ActionRequired, IdentifierPrefix, LocationScheme, Oobi,
-};
-use keri_sdk::keri_core::{
+use keri_sdk::advanced::{ActionRequired, IdentifierPrefix, LocationScheme, Oobi};
+use keri_sdk::advanced::raw::keri_core::{
     actor::event_generator,
     event::KeyEvent,
     event_message::{
@@ -17,9 +15,7 @@ use keri_sdk::keri_core::{
     query::mailbox::MailboxRoute,
     signer::Signer,
 };
-use keri_sdk::said::SelfAddressingIdentifier;
-use keri_sdk::types::MultisigConfig;
-use keri_sdk::Identifier;
+use keri_sdk::advanced::{Identifier, MultisigConfig, SelfAddressingIdentifier};
 
 use crate::{error::CliError, keri::KeriError, utils::Requests};
 
@@ -45,7 +41,10 @@ pub async fn group_incept(
         witness_threshold,
         delegator: None,
     };
-    Ok(keri_sdk::operations::create_multisig(initiator_id, &initiator_signer, config).await?)
+    Ok(
+        keri_sdk::advanced::operations::create_multisig(initiator_id, &initiator_signer, config)
+            .await?,
+    )
 }
 
 pub async fn pull_mailbox(
@@ -56,7 +55,7 @@ pub async fn pull_mailbox(
 
     // Quering mailbox to get multisig request
     let query: Vec<TypedEvent<EventTypeTag, Timestamped<MailboxRoute>>> = identifier
-        .query_mailbox(&identifier.id(), &witnesses.collect::<Vec<_>>())
+        .query_mailbox(&identifier.id(), &witnesses)
         .unwrap();
 
     let mut out = Vec::new();
@@ -80,7 +79,7 @@ pub async fn pull_group_mailbox(
 
     // Quering mailbox to get multisig request
     let query: Vec<TypedEvent<EventTypeTag, Timestamped<MailboxRoute>>> = identifier
-        .query_mailbox(group_id, &witnesses.collect::<Vec<_>>())
+        .query_mailbox(group_id, &witnesses)
         .unwrap();
 
     let mut out = Vec::new();

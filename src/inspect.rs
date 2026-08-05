@@ -1,15 +1,17 @@
-use keri_sdk::cesrox::{
+use keri_sdk::advanced::raw::cesrox::{
     group::Group,
     primitives::{IndexedSignature, PublicKey, Signature},
 };
-use keri_sdk::keri_controller::{BasicPrefix, CesrPrimitive, SelfSigningPrefix};
-use keri_sdk::said::{derivation::HashFunctionCode, SelfAddressingIdentifier};
+use keri_sdk::advanced::{
+    BasicPrefix, CesrPrimitive, HashFunctionCode, SelfAddressingIdentifier, SelfSigningPrefix,
+};
 
 fn readable_self_signing(sig: SelfSigningPrefix) -> String {
     let description = match &sig {
         SelfSigningPrefix::Ed25519Sha512(_) => "Ed25519 signature",
         SelfSigningPrefix::ECDSAsecp256k1Sha256(_) => "ECDSA secp256k1 signature",
         SelfSigningPrefix::Ed448(_) => "Ed448 signature",
+        SelfSigningPrefix::ECDSA256r1Sha256(_) => "ECDSA secp256r1 (P-256) signature",
     };
     format!("{} ({})\n", sig.to_str(), description)
 }
@@ -27,6 +29,9 @@ fn _readable_basic(bp: BasicPrefix) -> String {
         }
         BasicPrefix::X25519(_public_key) => "X25519 public encryption key",
         BasicPrefix::X448(_public_key) => "X448 public encryption key",
+        BasicPrefix::ECDSA256r1NT(_public_key) | BasicPrefix::ECDSA256r1(_public_key) => {
+            "ECDSA secp256r1 (P-256) public verification or encryption key"
+        }
     };
     format!("{} ({})\n", bp.to_str(), description)
 }
@@ -53,7 +58,7 @@ fn readable_indexed_signature(indexed: &IndexedSignature) -> String {
 }
 
 fn readable_anchoring_seal(
-    seal: keri_sdk::cesrox::primitives::AnchoringEventSeal,
+    seal: keri_sdk::advanced::raw::cesrox::primitives::AnchoringEventSeal,
 ) -> String {
     let (identifier, sn, digest) = seal;
     format!(
@@ -68,7 +73,7 @@ fn readable_nontrans_receipt(pair: (PublicKey, Signature)) -> String {
     let (identifier, signature) = pair;
     let identifier = BasicPrefix::new(
         identifier.0,
-        keri_sdk::keri_core::keys::PublicKey {
+        keri_sdk::advanced::raw::keri_core::keys::PublicKey {
             public_key: identifier.1,
         },
     )
@@ -135,6 +140,7 @@ fn print_group(group: Group) {
             }
         }
         Group::SourceSealCouples(_)
+        | Group::TransLastIdxSigGroups(_)
         | Group::FirstSeenReplyCouples(_)
         | Group::PathedMaterialQuadruplet(_, _)
         | Group::TSPPayload(_) => {
@@ -144,20 +150,20 @@ fn print_group(group: Group) {
 }
 
 pub fn inspect(cesr: &str) {
-    use keri_sdk::cesrox::value::Value;
+    use keri_sdk::advanced::raw::cesrox::value::Value;
     let no_whitespace = cesr
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect::<String>();
     let (rest, values) =
-        keri_sdk::cesrox::parse_all(&no_whitespace).expect("Invalid CESR stream");
+        keri_sdk::advanced::raw::cesrox::parse_all(&no_whitespace).expect("Invalid CESR stream");
     for value in values {
         match value {
             Value::Payload(payload) => {
                 let bytes = match payload {
-                    keri_sdk::cesrox::payload::Payload::JSON(b)
-                    | keri_sdk::cesrox::payload::Payload::CBOR(b)
-                    | keri_sdk::cesrox::payload::Payload::MGPK(b) => b,
+                    keri_sdk::advanced::raw::cesrox::payload::Payload::JSON(b)
+                    | keri_sdk::advanced::raw::cesrox::payload::Payload::CBOR(b)
+                    | keri_sdk::advanced::raw::cesrox::payload::Payload::MGPK(b) => b,
                 };
                 println!("Payload: {}", String::from_utf8_lossy(&bytes));
             }

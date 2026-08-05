@@ -1,5 +1,4 @@
-use keri_sdk::keri_controller::{mailbox_updating::ActionRequired, CesrPrimitive};
-use keri_sdk::said::SelfAddressingIdentifier;
+use keri_sdk::advanced::{ActionRequired, CesrPrimitive, SelfAddressingIdentifier};
 use std::{
     fs::{self, File},
     io::Write,
@@ -8,19 +7,18 @@ use std::{
 };
 
 use anyhow::Result;
-use keri_sdk::keri_controller::{
-    config::ControllerConfig,
-    identifier::mechanics::MechanicsError,
-    IdentifierPrefix, LocationScheme, RedbController as Controller, RedbIdentifier, SeedPrefix,
+use keri_sdk::advanced::raw::keri_controller::{RedbController as Controller, RedbIdentifier};
+use keri_sdk::advanced::{
+    ControllerConfig, IdentifierPrefix, LocationScheme, MechanicsError, SeedPrefix,
     SelfSigningPrefix,
 };
-use keri_sdk::keri_core::{
+use keri_sdk::advanced::raw::keri_core::{
     event::KeyEvent,
     event_message::msg::KeriEvent,
     mailbox::exchange::{Exchange, ExchangeMessage},
     signer::Signer,
 };
-use keri_sdk::{store::KeriStore, Identifier};
+use keri_sdk::advanced::{store::KeriStore, Identifier};
 use serde::de::DeserializeOwned;
 use serde_json::{from_value, json, Value};
 use thiserror::Error;
@@ -38,9 +36,9 @@ pub enum LoadingError {
     #[error("Parsing error: {0}")]
     ParsingError(String),
     #[error("Controller error: {0}")]
-    ControllerError(#[from] keri_sdk::keri_controller::error::ControllerError),
+    ControllerError(#[from] keri_sdk::advanced::raw::keri_controller::error::ControllerError),
     #[error("SDK error: {0}")]
-    Sdk(#[from] keri_sdk::Error),
+    Sdk(#[from] keri_sdk::advanced::Error),
     #[error("Signer error: {0}")]
     SignerError(String),
     #[error("Can't load home path")]
@@ -80,7 +78,7 @@ pub fn keri_store() -> Result<&'static KeriStore, LoadingError> {
 pub fn ed25519_sig(
     signer: &Signer,
     data: &[u8],
-) -> Result<SelfSigningPrefix, keri_sdk::keri_core::keys::KeysError> {
+) -> Result<SelfSigningPrefix, keri_sdk::advanced::raw::keri_core::keys::KeysError> {
     Ok(SelfSigningPrefix::Ed25519Sha512(signer.sign(data)?))
 }
 
@@ -280,8 +278,8 @@ pub fn collect_witness_data(
     );
     let witness_threshold = state.witness_config.tally;
     let witness_threshold = match witness_threshold {
-        keri_sdk::keri_core::event::sections::threshold::SignatureThreshold::Simple(i) => i,
-        keri_sdk::keri_core::event::sections::threshold::SignatureThreshold::Weighted(
+        keri_sdk::advanced::SignatureThreshold::Simple(i) => i,
+        keri_sdk::advanced::SignatureThreshold::Weighted(
             _weighted_threshold,
         ) => {
             todo!()
@@ -291,7 +289,7 @@ pub fn collect_witness_data(
 }
 
 pub fn collect_watchers_data(identifier: &Identifier) -> Result<Vec<LocationScheme>, LoadingError> {
-    let watchers = identifier.get_role_location(identifier.id(), keri_sdk::keri_core::oobi::Role::Watcher)?;
+    let watchers = identifier.get_role_location(identifier.id(), keri_sdk::advanced::Role::Watcher)?;
     Ok(watchers)
 }
 
@@ -528,7 +526,7 @@ impl Requests {
 
 #[test]
 pub fn test_parse_json_arguments() {
-    use keri_sdk::keri_controller::LocationScheme;
+use keri_sdk::advanced::LocationScheme;
 
     let input_single = r#"{"eid":"BDg3H7Sr-eES0XWXiO8nvMxW6mD_1LxLeE1nuiZxhGp4","scheme":"http","url":"http://witness2.sandbox.argo.colossi.network/"}"#;
     let loc = parse_json_arguments::<LocationScheme>(&[input_single]);

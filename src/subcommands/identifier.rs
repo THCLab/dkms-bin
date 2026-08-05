@@ -5,7 +5,7 @@ use std::{
 };
 
 use clap::Subcommand;
-use keri_sdk::keri_controller::LocationScheme;
+use keri_sdk::advanced::LocationScheme;
 use tabled::{builder::Builder, settings::Style};
 use url::Url;
 

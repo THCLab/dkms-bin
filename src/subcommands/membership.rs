@@ -1,5 +1,5 @@
 use clap::Subcommand;
-use keri_sdk::said::SelfAddressingIdentifier;
+use keri_sdk::advanced::SelfAddressingIdentifier;
 use std::{str::FromStr, sync::Arc, thread::sleep, time::Duration};
 
 #[derive(Subcommand)]
@@ -223,7 +223,7 @@ pub async fn process_membership_command(cmd: MembershipCommand) {
                 let state = id.find_state(&group_id);
                 match state {
 						                    Ok(state) => println!("State: {}", serde_json::to_string_pretty(&state).unwrap()),
-						                    Err(keri_sdk::Error::Mechanics(MechanicsError::UnknownIdentifierError(_id))) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
+						                    Err(keri_sdk::advanced::Error::Mechanics(MechanicsError::UnknownIdentifierError(_id))) => println!("Not all participants have accepted the group. Try `membership pending` to check for confirmation."),
 						                    Err(e) => println!("Error: {:?}", e),
 					                    }
             } else {
@@ -376,12 +376,9 @@ async fn pull_mailbox_helper(
     }
 }
 
-use keri_sdk::keri_controller::{
-    identifier::mechanics::MechanicsError, mailbox_updating::ActionRequired, IdentifierPrefix,
-    Oobi,
+use keri_sdk::advanced::{
+    ActionRequired, Identifier, IdentifierPrefix, MechanicsError, Oobi, Signer,
 };
-use keri_sdk::keri_core::signer::Signer;
-use keri_sdk::Identifier;
 use redb::{
     Database, MultimapTableDefinition, ReadableMultimapTable, ReadableTable, TableDefinition,
 };

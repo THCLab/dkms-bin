@@ -10,10 +10,9 @@ use std::{
 use config_file::{ConfigFileError, FromConfigFile};
 use ed25519_dalek::SigningKey;
 
-use keri_sdk::keri_controller::{BasicPrefix, LocationScheme, SeedPrefix};
-use keri_sdk::keri_core::signer::Signer;
-use keri_sdk::types::IdentifierConfig;
-use keri_sdk::Identifier;
+use keri_sdk::advanced::{
+    BasicPrefix, Identifier, IdentifierConfig, LocationScheme, SeedPrefix, Signer, SignerAlgorithm,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -207,7 +206,7 @@ pub(crate) async fn handle_new_id(
     let id = incept(
         db_path.to_path_buf(),
         keys.current.clone(),
-        keri_sdk::keri_controller::BasicPrefix::Ed25519NT(npk),
+        keri_sdk::advanced::BasicPrefix::Ed25519NT(npk),
         kel_config.witness.unwrap_or_default(),
         kel_config.witness_threshold,
         None,
@@ -236,8 +235,9 @@ async fn incept(
         witnesses: witness,
         witness_threshold,
         watchers: watcher,
+        algorithm: SignerAlgorithm::Ed25519,
     };
-    Ok(keri_sdk::operations::create_identifier(db_path, signer, next_key, config).await?)
+    Ok(keri_sdk::advanced::operations::create_identifier(db_path, signer, next_key, config).await?)
 }
 
 #[test]

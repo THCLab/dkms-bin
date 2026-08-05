@@ -2,8 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::Subcommand;
-use keri_sdk::keri_controller::{EndRole, IdentifierPrefix, LocationScheme, Oobi};
-use keri_sdk::Identifier;
+use keri_sdk::advanced::{EndRole, Identifier, IdentifierPrefix, LocationScheme, Oobi};
 
 use crate::{
     keri::KeriError,
@@ -53,7 +52,7 @@ pub fn watcher(identifier: &Identifier) -> Result<Vec<IdentifierPrefix>, CliErro
 /// Returns mesagebox' identifiers of alias
 pub fn mesagkesto(identifeir: &Identifier) -> Result<Vec<IdentifierPrefix>, CliError> {
     let msgbox = identifeir
-        .get_end_role(identifeir.id(), keri_sdk::keri_core::oobi::Role::Messagebox)
+        .get_end_role(identifeir.id(), keri_sdk::advanced::Role::Messagebox)
         .map_err(KeriError::Sdk)?
         .into_iter()
         .map(|b| b.eid)
@@ -98,14 +97,14 @@ pub fn find_oobi(
                 .flat_map(|cid| {
                     let mut oobis = vec![Oobi::EndRole(EndRole {
                         eid: cid.clone(),
-                        role: keri_sdk::keri_core::oobi::Role::Witness,
+                        role: keri_sdk::advanced::Role::Witness,
                         cid: identifier.id().clone(),
                     })];
 
                     if let Some(reg) = identifier.registry_id() {
                         oobis.push(Oobi::EndRole(EndRole {
                             cid: reg.clone(),
-                            role: keri_sdk::keri_core::oobi::Role::Witness,
+                            role: keri_sdk::advanced::Role::Witness,
                             eid: cid.clone(),
                         }));
                     }

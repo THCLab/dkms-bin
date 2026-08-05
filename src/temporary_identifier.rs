@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use keri_sdk::keri_controller::{
+use keri_sdk::advanced::raw::keri_controller::{
     communication::{Communication, HTTPTelTransport, SendingError},
     error::ControllerError,
     identifier::nontransferable::NontransferableIdentifier,
     known_events::RedbKnownEvents,
     BasicPrefix, IdentifierPrefix, LocationScheme,
 };
-use keri_sdk::keri_core::{
+use keri_sdk::advanced::raw::keri_core::{
     actor::{
         error::ActorError, possible_response::PossibleResponse, prelude::Message, QueryError,
         SignedQueryError,
@@ -18,7 +18,7 @@ use keri_sdk::keri_core::{
     signer::Signer,
     transport::default::DefaultTransport,
 };
-use keri_sdk::teliox::database::redb::RedbTelDatabase;
+use keri_sdk::advanced::raw::teliox::database::redb::RedbTelDatabase;
 use tempfile::Builder;
 
 use crate::export::ExportError;
@@ -68,7 +68,7 @@ impl TemporaryIdentifier {
         };
 
         let qry = self.id.query_log(id, sn, limit, witness_id);
-        let signature = self.id.sign(self.signer.sign(qry.encode()?).unwrap());
+        let signature = self.id.sign(self.signer.sign(qry.encode()?).unwrap())?;
         let resp = self
             .id
             .finalize_query(witness_location, qry, signature)
@@ -96,7 +96,7 @@ impl TemporaryIdentifier {
         };
 
         let qry = self.id.query_ksn(&id, witness_id);
-        let signature = self.id.sign(self.signer.sign(qry.encode()?).unwrap());
+        let signature = self.id.sign(self.signer.sign(qry.encode()?).unwrap())?;
         let resp = self
             .id
             .finalize_query(witness_location, qry, signature)
@@ -118,7 +118,7 @@ impl TemporaryIdentifier {
     ) -> String {
         let tel_qry = self.id.query_tel(registry_id.clone(), vc_id).unwrap();
         let signature = self.signer.sign(tel_qry.encode().unwrap()).unwrap();
-        let sig = self.id.sign(signature);
+        let sig = self.id.sign(signature).unwrap();
         self.id
             .finalize_query_tel(witness, tel_qry, sig)
             .await

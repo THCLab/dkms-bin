@@ -1,11 +1,12 @@
 use std::fs::create_dir_all;
 
-use keri_sdk::keri_controller::config::ControllerConfig;
-use keri_sdk::keri_controller::RedbController as Controller;
-use keri_sdk::keri_controller::{RedbIdentifier as Identifier, IdentifierPrefix, LocationScheme, SeedPrefix};
-use keri_sdk::keri_controller::{CesrPrimitive, EndRole, Oobi};
-use keri_sdk::keri_core::event::sections::seal::EventSeal;
-use keri_sdk::keri_core::oobi::Role;
+use keri_sdk::advanced::raw::keri_controller::{
+    RedbController as Controller, RedbIdentifier as Identifier,
+};
+use keri_sdk::advanced::{
+    CesrPrimitive, ControllerConfig, EndRole, EventSeal, IdentifierPrefix, LocationScheme, Oobi,
+    Role, SeedPrefix,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::tel::save_registry;

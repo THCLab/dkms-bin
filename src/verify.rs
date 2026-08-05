@@ -2,18 +2,18 @@ use std::{thread::sleep, time::Duration};
 
 use acdc::Attestation;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use keri_sdk::keri_controller::{
+use keri_sdk::advanced::raw::keri_controller::{
     communication::SendingError, error::ControllerError, identifier::query::QueryResponse,
     IdentifierPrefix, LocationScheme, Oobi, SelfSigningPrefix, TelState,
 };
-use keri_sdk::Identifier;
-use keri_sdk::keri_core::{
+use keri_sdk::advanced::Identifier;
+use keri_sdk::advanced::raw::keri_core::{
     event::sections::seal::EventSeal,
     event_message::signature::{get_signatures, Signature, SignerData},
     processor::validator::{MoreInfoError, VerificationError},
     query::query_event::QueryEvent,
 };
-use keri_sdk::said::SelfAddressingIdentifier;
+use keri_sdk::advanced::SelfAddressingIdentifier;
 
 use crate::{
     keri::query_tel,
@@ -113,7 +113,7 @@ pub async fn handle_verify(
     for oobi in oobis {
         match who_id.send_oobi_to_watcher(who_id.id(), &oobi).await {
             Ok(_) => (),
-            Err(keri_sdk::Error::Controller(ControllerError::SendingError(sending_error))) => {
+            Err(keri_sdk::advanced::Error::Controller(ControllerError::SendingError(sending_error))) => {
                 return Err(sending_error.into());
             }
             Err(_) => unreachable!(),
@@ -128,16 +128,16 @@ pub async fn handle_verify(
     };
 
     // Parse cesr stream of message
-    use keri_sdk::cesrox::{payload::Payload, value::Value};
+    use keri_sdk::advanced::raw::cesrox::{payload::Payload, value::Value};
     let message_str = std::str::from_utf8(&message_bytes)
         .map_err(|e| VerifyHandleError::WrongSignatureFormat(e.to_string()))?;
-    let (rest, values) = keri_sdk::cesrox::parse_all(message_str)
+    let (rest, values) = keri_sdk::advanced::raw::cesrox::parse_all(message_str)
         .map_err(|e| VerifyHandleError::WrongSignatureFormat(e.to_string()))?;
     if !rest.is_empty() {
         return Err(VerifyHandleError::RemainingCESR(rest.to_string()));
     };
     let mut payload: Option<Payload> = None;
-    let mut attachments: Vec<keri_sdk::cesrox::group::Group> = Vec::new();
+    let mut attachments: Vec<keri_sdk::advanced::raw::cesrox::group::Group> = Vec::new();
     for value in values {
         match value {
             Value::Payload(p) => payload = Some(p),
@@ -182,7 +182,7 @@ pub async fn handle_verify(
     if !attachments.is_empty() {
         match who_id.verify_from_cesr(&message_bytes) {
             Ok(_) => Ok(ACDCState::VerificationSuccess),
-            Err(keri_sdk::Error::Controller(ControllerError::VerificationError(e))) => {
+            Err(keri_sdk::advanced::Error::Controller(ControllerError::VerificationError(e))) => {
                 if e.iter()
                     .any(|(e, _)| matches!(e, VerificationError::VerificationFailure))
                 {
@@ -208,7 +208,7 @@ pub async fn handle_verify(
                 );
                 Err(VerifyHandleError::List(err_list))
             }
-            Err(keri_sdk::Error::Controller(ControllerError::CesrFormatError)) => Err(
+            Err(keri_sdk::advanced::Error::Controller(ControllerError::CesrFormatError)) => Err(
                 VerifyHandleError::WrongSignatureFormat("Wrong format".to_string()),
             ),
             Err(_e) => todo!(),
