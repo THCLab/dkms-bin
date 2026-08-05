@@ -4,13 +4,12 @@ use keri_sdk::advanced::raw::keri_controller::{
     RedbController as Controller, RedbIdentifier as Identifier,
 };
 use keri_sdk::advanced::{
-    CesrPrimitive, ControllerConfig, EndRole, EventSeal, IdentifierPrefix, LocationScheme, Oobi,
-    Role, SeedPrefix,
+    CesrPrimitive, ControllerConfig, EndRole, EphemeralIdentifier, EventSeal, IdentifierPrefix,
+    LocationScheme, Oobi, Role, SeedPrefix,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::tel::save_registry;
-use crate::temporary_identifier::generate_temporary_identifier;
 use crate::utils::{save_identifier, save_next_seed, save_seed};
 use crate::{
     init::{kel_database_path, KeysConfig},
@@ -71,7 +70,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         next: imported.next_seed,
     };
 
-    let tmp_id = generate_temporary_identifier()?;
+    let tmp_id = EphemeralIdentifier::new().map_err(|e| ExportError::TemporaryId(e.to_string()))?;
 
     let store_path = kel_database_path(alias)?;
     let mut db_path = store_path.clone();
@@ -101,13 +100,13 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
         // Find KEL
         let id = imported.last_event_seal.prefix.clone();
         let sn = imported.last_event_seal.sn;
-        let kel = tmp_id
-            .pull_kel(id.clone(), 0, sn + 1, witness.clone())
-            .await
-            .unwrap();
+        let kel = tmp_id.pull_kel(&id, 0, sn + 1, &witness).await.unwrap();
         if let Some(kel) = kel {
             for msg in kel {
-                controller.known_events.process(&msg).unwrap();
+                controller
+                    .known_events
+                    .process_stream(msg.as_bytes())
+                    .unwrap();
             }
         } else {
             println!("Identifier {} KEL not found", &id);
@@ -115,7 +114,7 @@ pub async fn handle_import(alias: &str, imported: IdentifierExport) -> Result<()
 
         // Find TEL
         if let Some(registry_id) = &imported.registry_id {
-            let tel_resp = tmp_id.pull_tel(registry_id, None, witness).await;
+            let tel_resp = tmp_id.pull_tel(registry_id, None, &witness).await.unwrap();
             controller
                 .known_events
                 .tel

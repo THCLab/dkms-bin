@@ -1,7 +1,5 @@
 use clap::Subcommand;
-use keri_sdk::advanced::{IdentifierPrefix, LocationScheme};
-
-use crate::temporary_identifier::generate_temporary_identifier;
+use keri_sdk::advanced::{EphemeralIdentifier, IdentifierPrefix, LocationScheme};
 
 #[derive(Subcommand)]
 pub enum DebugCommand {
@@ -46,10 +44,10 @@ pub enum DebugCommand {
 pub async fn process_debug_command(cmd: DebugCommand) {
     match cmd {
         DebugCommand::Ksn { source, id } => {
-            let tmp_id = generate_temporary_identifier().unwrap();
+            let tmp_id = EphemeralIdentifier::new().unwrap();
             let source: LocationScheme = serde_json::from_str(&source).unwrap();
 
-            let ksn = tmp_id.pull_ksn(id, source).await.unwrap();
+            let ksn = tmp_id.pull_ksn(&id, &source).await.unwrap();
 
             println!("{}", &ksn);
         }
@@ -58,10 +56,10 @@ pub async fn process_debug_command(cmd: DebugCommand) {
             vc_id,
             registry_id: id,
         } => {
-            let tmp_id = generate_temporary_identifier().unwrap();
+            let tmp_id = EphemeralIdentifier::new().unwrap();
             let source: LocationScheme = serde_json::from_str(&source).unwrap();
 
-            let tel = tmp_id.pull_tel(&id, vc_id, source).await;
+            let tel = tmp_id.pull_tel(&id, vc_id, &source).await.unwrap();
 
             println!("{}", &tel);
         }
@@ -71,23 +69,16 @@ pub async fn process_debug_command(cmd: DebugCommand) {
             sn,
             limit,
         } => {
-            let tmp_id = generate_temporary_identifier().unwrap();
+            let tmp_id = EphemeralIdentifier::new().unwrap();
             let source: LocationScheme = serde_json::from_str(&source).unwrap();
 
             let limit = limit.unwrap_or(1);
             let kel = tmp_id
-                .pull_kel(identifier.clone(), sn, limit, source)
+                .pull_kel(&identifier, sn, limit, &source)
                 .await
                 .unwrap();
             match kel {
-                Some(kel) => {
-                    let kel_str = kel
-                        .into_iter()
-                        .map(|event| String::from_utf8(event.to_cesr().unwrap()).unwrap())
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    println!("{}", kel_str);
-                }
+                Some(kel) => println!("{}", kel.join("\n")),
                 None => println!(
                     "Event with serial number {} not found for identifier {}",
                     sn, identifier

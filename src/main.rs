@@ -27,7 +27,6 @@ mod seed;
 mod sign;
 mod subcommands;
 mod tel;
-mod temporary_identifier;
 mod utils;
 mod verification_status;
 mod verify;

@@ -1,3 +1,18 @@
+## [Unreleased] - ephemeral identifier
+
+### 🔧 Changed
+
+- The hand-rolled `temporary_identifier` module is replaced by the SDK's
+  `keri_sdk::advanced::EphemeralIdentifier`. Witness KEL/KSN/TEL pulls in
+  `export.rs` and `subcommands/debug.rs` go through it directly, dropping
+  the local database, transport and signing plumbing (~125 lines) along
+  with the manual tempdir handling — the SDK ties the temporary database
+  to the value's lifetime.
+- `pull_kel` now yields CESR strings rather than `Message` values, so KEL
+  import processes them with `known_events.process_stream`, and the debug
+  `kel` command prints them without re-encoding. `pull_tel` is fallible
+  instead of panicking internally.
+
 ## [Unreleased] - keri-sdk 0.2.0
 
 ### 🔧 Changed (keri-sdk 0.2.0 upgrade)
