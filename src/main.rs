@@ -1,6 +1,7 @@
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use error::CliError;
 use subcommands::{
+    auth::{process_auth_command, AuthCommand},
     data::{process_data_command, DataCommand},
     debug::{process_debug_command, DebugCommand},
     identifier::{process_identifier_command, IdentifierCommand},
@@ -12,6 +13,7 @@ use subcommands::{
 };
 use utils::working_directory;
 
+mod auth;
 mod error;
 mod export;
 mod help;
@@ -83,6 +85,11 @@ enum Commands {
         #[command(subcommand)]
         command: MembershipCommand,
     },
+    /// Sign in to services through cyfron://auth links, or mint and verify them
+    Auth {
+        #[command(subcommand)]
+        command: AuthCommand,
+    },
 }
 
 #[tokio::main]
@@ -135,6 +142,7 @@ async fn process_command(command: Commands) -> Result<(), CliError> {
         }
         Commands::Debug { command } => process_debug_command(command).await,
         Commands::Membership { command } => process_membership_command(command).await,
+        Commands::Auth { command } => process_auth_command(command).await?,
     };
     Ok(())
 }

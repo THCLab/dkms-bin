@@ -41,7 +41,11 @@ pub enum IdentifierCommand {
         alias: String,
     },
     /// List all aliases and their corresponding identifiers
-    List,
+    List {
+        /// Print a JSON array of {alias, aid} instead of a table
+        #[arg(long)]
+        json: bool,
+    },
     /// List identifier OOBIs
     Oobi {
         #[command(subcommand)]
@@ -165,7 +169,25 @@ pub async fn process_identifier_command(
             .await
         }
         IdentifierCommand::Info { alias } => Ok(handle_info(&alias)?),
-        IdentifierCommand::List => {
+        IdentifierCommand::List { json: true } => {
+            let working_directory = working_directory()?;
+            let mut listed = Vec::new();
+            if let Ok(contents) = fs::read_dir(&working_directory) {
+                for entry in contents.flatten() {
+                    let Some(alias) = entry.file_name().to_str().map(str::to_string) else {
+                        continue;
+                    };
+                    // Directories without an `id` file are not identifiers.
+                    if let Ok(aid) = fs::read_to_string(entry.path().join("id")) {
+                        listed.push(serde_json::json!({ "alias": alias, "aid": aid.trim() }));
+                    }
+                }
+            }
+            listed.sort_by(|a, b| a["alias"].as_str().cmp(&b["alias"].as_str()));
+            println!("{}", serde_json::Value::Array(listed));
+            Ok(())
+        }
+        IdentifierCommand::List { json: false } => {
             let working_directory = working_directory()?;
             let mut builder = Builder::new();
             builder.push_record(["ALIAS", "IDENTIFIER"]);

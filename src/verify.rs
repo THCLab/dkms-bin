@@ -260,6 +260,66 @@ pub async fn handle_verify(
     }
 }
 
+/// Identifiers whose signatures are attached to a CESR stream. A signer is
+/// named either by an anchoring seal followed by the controller signatures
+/// it covers (what `data sign` produces), or by a last-establishment
+/// signature group; the pairing mirrors keriox's `collect_signatures`.
+/// Bare and non-transferable signatures name nobody, so callers that need a
+/// signer treat an empty result as "nobody they can authorize".
+pub fn signer_prefixes(message: &str) -> Result<Vec<IdentifierPrefix>, VerifyHandleError> {
+    use keri_sdk::advanced::raw::cesrox::{group::Group, value::Value};
+    let (rest, values) = keri_sdk::advanced::raw::cesrox::parse_all(message.trim())
+        .map_err(|e| VerifyHandleError::WrongSignatureFormat(e.to_string()))?;
+    if !rest.is_empty() {
+        return Err(VerifyHandleError::RemainingCESR(rest.to_string()));
+    }
+    let mut groups = Vec::new();
+    for value in values {
+        match value {
+            Value::SpecificGroup(g) => groups.push(g),
+            Value::UniversalGroup(_, inner) => groups.extend(inner.into_iter().filter_map(
+                |v| match v {
+                    Value::SpecificGroup(g) => Some(g),
+                    _ => None,
+                },
+            )),
+            _ => (),
+        }
+    }
+    let mut signers: Vec<IdentifierPrefix> = Vec::new();
+    let mut push = |prefix: IdentifierPrefix| {
+        if !signers.contains(&prefix) {
+            signers.push(prefix);
+        }
+    };
+    let mut iter = groups.into_iter().peekable();
+    while let Some(group) = iter.next() {
+        match group {
+            Group::AnchoringSeals(seals) => {
+                let signed = matches!(
+                    iter.peek(),
+                    Some(Group::IndexedControllerSignatures(sigs)) if !sigs.is_empty()
+                );
+                if let (true, Some(seal)) = (signed, seals.into_iter().next()) {
+                    iter.next();
+                    push(seal.0.into());
+                }
+            }
+            group @ Group::TransLastIdxSigGroups(_) => {
+                let signatures = get_signatures(group)
+                    .map_err(|e| VerifyHandleError::WrongSignatureFormat(e.to_string()))?;
+                for sig in signatures {
+                    if let Signature::Transferable(SignerData::LastEstablishment(prefix), _) = sig {
+                        push(prefix);
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+    Ok(signers)
+}
+
 async fn update_kel(
     alias: &str,
     who_id: &Identifier,

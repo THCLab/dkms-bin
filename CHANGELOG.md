@@ -1,3 +1,19 @@
+## [Unreleased] - cyfron sign-in
+
+### ✨ Added
+
+- `dkms auth respond` answers a `cyfron://auth?…` link from a DAuthZ
+  service's login page, so a dkms identifier can sign in where the Cyfron
+  app would: it checks the service's OOBI, signs the `cyfron-sp-auth`
+  envelope and POSTs it to the link's `callback_url`. Supports disclosed
+  attributes, credential presentation, declining and a dry run.
+- `dkms auth link` and `dkms auth verify` let a service without a
+  cyfron-serviced daemon mint links and check the answers; `verify` prints
+  the same `{valid, authorized, signer_aid}` verdict as the daemon.
+- `dkms identifier list --json`.
+- The deep-link and envelope wire format comes from `dauthz-core`, shared
+  with the DAuthZ servers.
+
 ## [Unreleased] - ephemeral identifier
 
 ### 🔧 Changed

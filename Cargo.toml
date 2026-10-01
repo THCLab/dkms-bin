@@ -30,6 +30,9 @@ futures = "0.3.31"
 tempfile = "3.10.0"
 redb = "2.4.0"
 serde_cbor = "0.11.2"
+# Wire format of the cyfron://auth sign-in ceremony (deep link, signed
+# envelope, callback body), shared with the DAuthZ servers.
+dauthz-core = { path = "../dauthz/dauthz-core" }
 
 [dev-dependencies]
 

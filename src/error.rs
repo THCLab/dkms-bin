@@ -3,6 +3,7 @@ use keri_sdk::advanced::{IdentifierPrefix, WatcherResponseError};
 use thiserror::Error;
 
 use crate::{
+    auth::AuthError,
     keri::KeriError,
     mesagkesto::MesagkestoError,
     said::SaidError,
@@ -53,4 +54,6 @@ pub enum CliError {
     IdentifierCommand(#[from] IdentifierSubcommandError),
     #[error("No watchers are configured for identifier {0}. Can't find TEL")]
     NoWatchers(IdentifierPrefix),
+    #[error("{0}")]
+    Auth(#[from] AuthError),
 }
