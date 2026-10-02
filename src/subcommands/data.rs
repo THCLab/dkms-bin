@@ -58,6 +58,13 @@ pub enum DataCommand {
         /// Use CBOR as serialization format. Output is CBOR-encoded binary data, represented in Base64.
         #[arg(short, long)]
         cbor: bool,
+        /// AID of the holder the credential is issued to (sets the ACDC's `a.i`)
+        #[arg(long)]
+        holder: Option<String>,
+        /// Print a presentable proof `{said, acdc, issuer_cesr}`: the ACDC plus
+        /// the issuer's signature over its exact bytes (JSON only)
+        #[arg(long, conflicts_with_all = ["cbor", "oobi"])]
+        proof: bool,
     },
     /// Revoke credential
     Revoke {
@@ -169,6 +176,8 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
             oca_bundle_said,
             oobi,
             cbor,
+            holder,
+            proof,
         } => {
             let format = if cbor {
                 SerializationFormats::CBOR
@@ -181,6 +190,8 @@ pub async fn process_data_command(command: DataCommand) -> Result<(), CliError> 
                 oca_bundle_said.to_string(),
                 oobi,
                 format,
+                holder.as_deref(),
+                proof,
             )
             .await?;
         }

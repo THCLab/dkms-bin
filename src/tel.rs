@@ -58,6 +58,8 @@ pub async fn handle_issue(
     scheme: String,
     oobi: bool,
     format: SerializationFormats,
+    holder: Option<&str>,
+    proof: bool,
 ) -> Result<(), CliError> {
     let mut id = load(alias)?;
 
@@ -73,18 +75,57 @@ pub async fn handle_issue(
             let registry_id = id.registry_id().as_ref().unwrap().to_string();
             save_registry(alias, &registry_id)?;
         };
-        let attestation = acdc::Attestation::new_public_untargeted(
-            &id.id().to_string(),
-            id.registry_id().unwrap().to_string(),
-            scheme,
-            attributes,
-            &format,
-            &HashFunctionCode::Blake3_256,
-        );
+        let issuer = id.id().to_string();
+        let registry = id.registry_id().unwrap().to_string();
+        let attestation = match holder {
+            Some(holder) => acdc::Attestation::new_public_targeted(
+                &issuer,
+                holder,
+                registry,
+                scheme,
+                attributes,
+                &format,
+                &HashFunctionCode::Blake3_256,
+            ),
+            None => acdc::Attestation::new_public_untargeted(
+                &issuer,
+                registry,
+                scheme,
+                attributes,
+                &format,
+                &HashFunctionCode::Blake3_256,
+            ),
+        };
 
         let said = attestation.digest.clone().unwrap();
 
-        keri_sdk::advanced::operations::issue(&mut id, signer, said).await?;
+        keri_sdk::advanced::operations::issue(&mut id, signer.clone(), said.clone()).await?;
+        if proof {
+            // The issuer's signature over the exact ACDC bytes, detached: what a
+            // holder presents to a verifier that checks signatures rather than
+            // querying the issuer's TEL.
+            let acdc = String::from_utf8(
+                attestation
+                    .encode(&HashFunctionCode::Blake3_256, &SerializationFormats::JSON)
+                    .unwrap(),
+            )
+            .unwrap();
+            let signature = crate::utils::ed25519_sig(&signer, acdc.as_bytes())
+                .map_err(crate::keri::KeriError::SigningError)?;
+            let signed = id
+                .sign_to_cesr(&acdc, &[signature])
+                .map_err(crate::keri::KeriError::Sdk)?;
+            let issuer_cesr = signed
+                .strip_prefix(acdc.as_str())
+                .ok_or(CliError::JsonExpected)?;
+            let out = serde_json::json!({
+                "said": said.to_string(),
+                "acdc": acdc,
+                "issuer_cesr": issuer_cesr,
+            });
+            println!("{}", out);
+            return Ok(());
+        }
         if oobi {
             match resolve::find_oobi(&id, &None) {
                 Ok(lcs) => {

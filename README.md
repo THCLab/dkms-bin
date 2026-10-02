@@ -32,7 +32,11 @@ link's `callback_url`. The login page then completes on its own. Options:
 - `--attr name=value` — disclose an attribute the service requested
   (registration links only).
 - `--present proof.json` — present a credential (`{acdc, issuer_cesr}`);
-  the envelope becomes `cyfron-sp-auth/2`.
+  the envelope becomes `cyfron-sp-auth/2`. An issuer produces that file
+  with `dkms data issue --holder <AID> --proof …`: the ACDC names the
+  holder in `a.i`, and the proof carries the issuer's signature over the
+  exact ACDC bytes, so a service can check it without querying the
+  issuer's registry.
 - `--deny [--reason …]` — decline; only the nonce is sent.
 - `--dry-run` — print the callback body instead of sending it.
 

@@ -11,6 +11,10 @@
   cyfron-serviced daemon mint links and check the answers; `verify` prints
   the same `{valid, authorized, signer_aid}` verdict as the daemon.
 - `dkms identifier list --json`.
+- `dkms data issue --holder <AID>` issues a credential to a holder (the
+  ACDC's `a.i`), and `--proof` prints `{said, acdc, issuer_cesr}`: the ACDC
+  with the issuer's detached signature over its exact bytes, the shape a
+  holder presents with `dkms auth respond --present`.
 - The deep-link and envelope wire format comes from `dauthz-core`, shared
   with the DAuthZ servers.
 
